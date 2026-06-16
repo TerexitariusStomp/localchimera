@@ -1,82 +1,80 @@
 import { Logger } from '../core/Logger.js';
+import os from 'os';
 
 /**
- * NodeOrchestrator manages multi-node collaborative wiki generation.
+ * Fleet orchestration for collaborative LLM wiki generation.
  *
- * Roles:
- *   - commander : distributes topics, receives worker registration,
- *                 broadcasts STOP to the fleet.
- *   - worker    : registers with a commander, polls for jobs,
- *                 generates wiki pages locally.
+ * Usage: set ORCHESTRATOR_ROLE=commander|worker in environment.
+ * Workers also need COMMANDER_URL=http://host:3000.
  *
- * Environment:
- *   ORCHESTRATOR_ROLE=commander|worker
- *   COMMANDER_URL=http://host:3000   (used by worker)
- *   ORCHESTRATOR_TAGS=tag1,tag2      (default tags for generated pages)
+ * Exported factory `createOrchestrator(config?)` returns the appropriate
+ * concrete implementation; both share the NodeOrchestrator interface expected
+ * by WebServer.
  */
 
-const ROLE = process.env.ORCHESTRATOR_ROLE || 'commander';
-const COMMANDER_URL = process.env.COMMANDER_URL || '';
-const DEFAULT_TAGS = (process.env.ORCHESTRATOR_TAGS || 'collaborative,ai-generated')
-  .split(',').map(t => t.trim()).filter(Boolean);
+const WORKER_OFFLINE_MS = 60_000;
+const WORKER_STALE_MS   = 120_000;
+const CLEANUP_INTERVAL  = 30_000;
+const POLL_INTERVAL     = 5_000;
+const REGISTER_INTERVAL = 30_000;
 
-export class NodeOrchestrator {
-  constructor() {
-    this.logger = new Logger('NodeOrchestrator');
-    this.role = ROLE;
+function normalizeUrl(url) {
+  return url.replace(/\/$/, '');
+}
 
-    // Commander state
-    this.workers = new Map(); // url -> { registeredAt, lastSeen, activeJobs, totalPages }
-    this.jobQueue = [];       // { topic, category, tags, assignedTo, status }
-    this.stopFlag = false;
-    this.completedJobs = [];
+function makeJobId() {
+  return `job-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
 
-    // Worker state
-    this.commanderUrl = COMMANDER_URL;
-    this.workerInterval = null;
-
-    if (this.role === 'commander') {
-      this.logger.info('Orchestrator running as COMMANDER');
-      this._startCommanderCleanup();
-    } else if (this.role === 'worker') {
-      this.logger.info(`Orchestrator running as WORKER -> ${this.commanderUrl}`);
-      this._startWorkerPoll();
+function getLocalIp() {
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const iface of ifaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
     }
   }
+  return 'localhost';
+}
 
-  /* ─── Commander API ─── */
+/* ─────────────────────────────────────────────────────────────
+   CommanderOrchestrator
+   ───────────────────────────────────────────────────────────── */
+
+export class CommanderOrchestrator {
+  constructor({ defaultTags = ['collaborative', 'ai-generated'] } = {}) {
+    this.logger       = new Logger('Commander');
+    this.role         = 'commander';
+    this.workers      = new Map();
+    this.jobQueue     = [];
+    this.completedJobs = [];
+    this.stopFlag     = false;
+    this.defaultTags  = defaultTags;
+    this._cleanupTimer = null;
+  }
+
+  start() {
+    this.logger.info('Commander started');
+    this._cleanupTimer = setInterval(() => this._evictStaleWorkers(), CLEANUP_INTERVAL);
+    return this;
+  }
+
+  stop() {
+    clearInterval(this._cleanupTimer);
+  }
 
   registerWorker(workerUrl) {
-    if (this.role !== 'commander') return { ok: false, error: 'not a commander' };
-    const clean = workerUrl.replace(/\/$/, '');
-    const existing = this.workers.get(clean);
-    this.workers.set(clean, {
-      url: clean,
-      registeredAt: existing?.registeredAt || Date.now(),
-      lastSeen: Date.now(),
-      activeJobs: existing?.activeJobs || 0,
-      totalPages: existing?.totalPages || 0,
-      online: true,
-    });
-    this.logger.info(`Worker registered: ${clean} (total: ${this.workers.size})`);
+    const url = normalizeUrl(workerUrl);
+    const existing = this.workers.get(url) ?? { registeredAt: Date.now(), activeJobs: 0, totalPages: 0 };
+    this.workers.set(url, { ...existing, url, lastSeen: Date.now(), online: true });
+    this.logger.info(`Worker registered: ${url} (total: ${this.workers.size})`);
     return { ok: true, workers: this.workers.size };
   }
 
-  heartbeat(workerUrl) {
-    if (this.role !== 'commander') return { ok: false };
-    const clean = workerUrl.replace(/\/$/, '');
-    const w = this.workers.get(clean);
-    if (w) {
-      w.lastSeen = Date.now();
-      w.online = true;
-    }
-    return { ok: !!w };
-  }
-
   getWorkers() {
+    const now = Date.now();
     return Array.from(this.workers.values()).map(w => ({
       url: w.url,
-      online: w.online && (Date.now() - w.lastSeen < 60000),
+      online: w.online && (now - w.lastSeen < WORKER_OFFLINE_MS),
       activeJobs: w.activeJobs,
       totalPages: w.totalPages,
       lastSeen: new Date(w.lastSeen).toISOString(),
@@ -95,188 +93,210 @@ export class NodeOrchestrator {
   }
 
   addJobs(jobs) {
-    if (this.role !== 'commander') return { ok: false, error: 'not a commander' };
     if (this.stopFlag) return { ok: false, error: 'fleet stopped' };
     for (const j of jobs) {
       this.jobQueue.push({
-        id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: makeJobId(),
         topic: j.topic,
-        category: j.category || 'concepts',
-        tags: j.tags || DEFAULT_TAGS,
+        category: j.category ?? 'concepts',
+        tags: j.tags ?? this.defaultTags,
         status: 'pending',
         assignedTo: null,
         createdAt: Date.now(),
       });
     }
-    this.logger.info(`Added ${jobs.length} jobs. Queue: ${this.jobQueue.length}`);
+    this.logger.info(`Added ${jobs.length} jobs. Queue depth: ${this.jobQueue.length}`);
     return { ok: true, queued: this.jobQueue.length };
   }
 
   claimJob(workerUrl) {
-    if (this.role !== 'commander') return { stop: true };
     if (this.stopFlag) return { stop: true };
+    const url = normalizeUrl(workerUrl);
+    this._touchWorker(url);
 
-    const clean = workerUrl.replace(/\/$/, '');
-    const w = this.workers.get(clean);
-    if (w) {
-      w.lastSeen = Date.now();
-      w.online = true;
-    }
+    const job = this.jobQueue.find(j => j.status === 'pending');
+    if (!job) return { jobs: [] };
 
-    const idx = this.jobQueue.findIndex(j => j.status === 'pending');
-    if (idx === -1) return { jobs: [] };
-
-    const job = this.jobQueue[idx];
     job.status = 'running';
-    job.assignedTo = clean;
+    job.assignedTo = url;
+    const w = this.workers.get(url);
     if (w) w.activeJobs += 1;
 
-    return { jobs: [{
-      id: job.id,
-      topic: job.topic,
-      category: job.category,
-      tags: job.tags,
-    }] };
+    return { jobs: [{ id: job.id, topic: job.topic, category: job.category, tags: job.tags }] };
   }
 
   completeJob(jobId, workerUrl, pagesGenerated = 1) {
-    if (this.role !== 'commander') return;
-    const clean = workerUrl.replace(/\/$/, '');
-    const w = this.workers.get(clean);
+    const url = normalizeUrl(workerUrl);
+    const w = this.workers.get(url);
     if (w) {
-      w.activeJobs = Math.max(0, w.activeJobs - 1);
+      w.activeJobs  = Math.max(0, w.activeJobs - 1);
       w.totalPages += pagesGenerated;
     }
     const idx = this.jobQueue.findIndex(j => j.id === jobId);
     if (idx !== -1) {
-      const job = this.jobQueue.splice(idx, 1)[0];
-      job.status = 'completed';
-      job.completedAt = Date.now();
-      this.completedJobs.push(job);
+      const [job] = this.jobQueue.splice(idx, 1);
+      this.completedJobs.push({ ...job, status: 'completed', completedAt: Date.now() });
     }
   }
 
   stopFleet() {
-    if (this.role !== 'commander') return { ok: false };
     this.stopFlag = true;
-    this.logger.info('STOP flag raised. Fleet will halt after current jobs.');
-
-    // Notify workers immediately
+    this.logger.info('STOP flag raised. Notifying workers...');
     for (const [url, w] of this.workers) {
       if (!w.online) continue;
       fetch(`${url}/api/worker/stop`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-        .catch(() => { /* worker may be unreachable */ });
+        .catch(() => {});
     }
     return { ok: true, stopped: this.workers.size };
   }
 
   startFleet() {
-    if (this.role !== 'commander') return { ok: false };
     this.stopFlag = false;
-    this.logger.info('START flag raised. Fleet resumes accepting jobs.');
+    this.logger.info('Fleet resumed');
     return { ok: true };
   }
 
-  _startCommanderCleanup() {
-    setInterval(() => {
-      const now = Date.now();
-      for (const [url, w] of this.workers) {
-        if (now - w.lastSeen > 120000) {
-          w.online = false;
-          // Requeue orphaned jobs
-          this.jobQueue.forEach(j => {
-            if (j.status === 'running' && j.assignedTo === url) {
-              j.status = 'pending';
-              j.assignedTo = null;
-            }
-          });
-        }
-      }
-    }, 30000);
+  receiveStop() {
+    /* no-op on commander */
   }
 
-  /* ─── Worker API ─── */
+  _touchWorker(url) {
+    const w = this.workers.get(url);
+    if (w) { w.lastSeen = Date.now(); w.online = true; }
+  }
 
-  _startWorkerPoll() {
+  _evictStaleWorkers() {
+    const now = Date.now();
+    for (const [url, w] of this.workers) {
+      if (now - w.lastSeen > WORKER_STALE_MS) {
+        w.online = false;
+        this.jobQueue
+          .filter(j => j.status === 'running' && j.assignedTo === url)
+          .forEach(j => { j.status = 'pending'; j.assignedTo = null; });
+      }
+    }
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   WorkerOrchestrator
+   ───────────────────────────────────────────────────────────── */
+
+export class WorkerOrchestrator {
+  constructor({ commanderUrl, localPort = 3000 } = {}) {
+    this.logger       = new Logger('Worker');
+    this.role         = 'worker';
+    this.commanderUrl = commanderUrl ? normalizeUrl(commanderUrl) : '';
+    this.localPort    = localPort;
+    this.stopFlag     = false;
+    this._timers      = [];
+  }
+
+  start() {
     if (!this.commanderUrl) {
-      this.logger.warn('WORKER mode but no COMMANDER_URL set. Polling disabled.');
-      return;
+      this.logger.warn('No COMMANDER_URL set — worker polling disabled');
+      return this;
     }
-
-    const register = async () => {
-      try {
-        const myUrl = `http://${this._getLocalIP()}:3000`;
-        const res = await fetch(`${this.commanderUrl}/api/commander/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ workerUrl: myUrl }),
-        });
-        const json = await res.json();
-        if (json.success) this.logger.info('Registered with commander');
-      } catch (e) { /* retry next cycle */ }
-    };
-
-    const poll = async () => {
-      try {
-        const myUrl = `http://${this._getLocalIP()}:3000`;
-        const res = await fetch(`${this.commanderUrl}/api/commander/jobs?worker=${encodeURIComponent(myUrl)}`);
-        const json = await res.json();
-        if (!json.success) return;
-
-        if (json.data?.stop) {
-          this.logger.info('Received STOP signal from commander');
-          this.stopFlag = true;
-          return;
-        }
-
-        for (const job of json.data?.jobs || []) {
-          this._runLocalJob(job, myUrl);
-        }
-      } catch (e) { /* retry next cycle */ }
-    };
-
-    register();
-    setInterval(register, 30000); // re-register every 30s
-    this.workerInterval = setInterval(poll, 5000); // poll for jobs every 5s
+    this.logger.info(`Worker started -> ${this.commanderUrl}`);
+    this._register();
+    this._timers.push(setInterval(() => this._register(), REGISTER_INTERVAL));
+    this._timers.push(setInterval(() => this._pollJobs(), POLL_INTERVAL));
+    return this;
   }
 
-  async _runLocalJob(job, myUrl) {
-    this.logger.info(`Starting local job: ${job.topic}`);
-    try {
-      // Call the local llmwiki-create endpoint
-      const res = await fetch('http://localhost:3000/api/llmwiki-create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: job.topic,
-          category: job.category,
-          tags: job.tags,
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        this.logger.info(`Job submitted locally: ${job.id}`);
-        // Report completion to commander
-        fetch(`${this.commanderUrl}/api/commander/complete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jobId: job.id, workerUrl: myUrl }),
-        }).catch(() => {});
-      }
-    } catch (e) {
-      this.logger.error(`Local job failed: ${e.message}`);
-    }
+  stop() {
+    this._timers.forEach(t => clearInterval(t));
   }
 
   receiveStop() {
     this.stopFlag = true;
-    this.logger.info('Received STOP signal. Worker will halt after current job.');
+    this.logger.info('Received STOP. Worker halts after current job.');
   }
 
-  /* ─── Shared ─── */
+  /* Commander API stubs — worker defers to commander over HTTP */
+  registerWorker()  { return { ok: false, error: 'not a commander' }; }
+  getWorkers()      { return []; }
+  getFleetStats()   { return { workers: 0, online: 0, queueLength: 0, completedJobs: 0, stopFlag: this.stopFlag }; }
+  addJobs()         { return { ok: false, error: 'not a commander' }; }
+  claimJob()        { return { jobs: [] }; }
+  completeJob()     {}
+  stopFleet()       { return { ok: false, error: 'not a commander' }; }
+  startFleet()      { return { ok: false, error: 'not a commander' }; }
 
-  _getLocalIP() {
-    // Return a reasonable default; in real deployments this could use os.networkInterfaces
-    return 'localhost';
+  get _myUrl() {
+    return `http://${getLocalIp()}:${this.localPort}`;
+  }
+
+  async _register() {
+    try {
+      const res = await fetch(`${this.commanderUrl}/api/commander/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workerUrl: this._myUrl }),
+      });
+      const json = await res.json();
+      if (json.success) this.logger.info('Registered with commander');
+    } catch { /* retry on next interval */ }
+  }
+
+  async _pollJobs() {
+    if (this.stopFlag) return;
+    try {
+      const res = await fetch(`${this.commanderUrl}/api/commander/jobs?worker=${encodeURIComponent(this._myUrl)}`);
+      const json = await res.json();
+      if (!json.success) return;
+      if (json.data?.stop) { this.receiveStop(); return; }
+      for (const job of json.data?.jobs ?? []) {
+        this._runJob(job);
+      }
+    } catch { /* retry on next interval */ }
+  }
+
+  async _runJob(job) {
+    this.logger.info(`Running job: ${job.topic}`);
+    try {
+      const res = await fetch(`http://localhost:${this.localPort}/api/llmwiki-create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: job.topic, category: job.category, tags: job.tags }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        this.logger.info(`Job dispatched locally: ${job.id}`);
+        fetch(`${this.commanderUrl}/api/commander/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: job.id, workerUrl: this._myUrl }),
+        }).catch(() => {});
+      }
+    } catch (e) {
+      this.logger.error(`Job failed: ${e.message}`);
+    }
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Factory — reads env, instantiates the right class
+   ───────────────────────────────────────────────────────────── */
+
+export function createOrchestrator(config = {}) {
+  const role = config.role ?? process.env.ORCHESTRATOR_ROLE ?? 'commander';
+  const defaultTags = (config.defaultTags ?? process.env.ORCHESTRATOR_TAGS ?? 'collaborative,ai-generated')
+    .split(',').map(t => t.trim()).filter(Boolean);
+
+  if (role === 'worker') {
+    return new WorkerOrchestrator({
+      commanderUrl: config.commanderUrl ?? process.env.COMMANDER_URL ?? '',
+      localPort:    config.localPort    ?? parseInt(process.env.PORT ?? '3000', 10),
+    }).start();
+  }
+
+  return new CommanderOrchestrator({ defaultTags }).start();
+}
+
+/* Default export keeps WebServer import unchanged */
+export class NodeOrchestrator {
+  constructor(config) {
+    return createOrchestrator(config);
   }
 }

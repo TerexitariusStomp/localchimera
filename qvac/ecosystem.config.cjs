@@ -1,43 +1,34 @@
 const path = require('path');
 const ROOT = __dirname;
 
+const base = {
+  watch: false,
+  autorestart: true,
+  max_restarts: 10,
+  restart_delay: 3000,
+  kill_timeout: 15000,
+  log_date_format: 'YYYY-MM-DD HH:mm:ss',
+  merge_logs: true,
+  time: true,
+};
+
 module.exports = {
   apps: [
     {
+      ...base,
       name: 'qvac-node',
       script: path.join(ROOT, 'src/index.js'),
       cwd: ROOT,
-      watch: false,
-      autorestart: true,
-      max_restarts: 10,
-      restart_delay: 3000,
       max_memory_restart: '4G',
-      kill_timeout: 15000,
       env: {
         NODE_ENV: 'production',
-        PORT: 3000
+        PORT: process.env.PORT || 3000,
+        ORCHESTRATOR_ROLE: process.env.ORCHESTRATOR_ROLE || 'commander',
+        COMMANDER_URL: process.env.COMMANDER_URL || '',
+        ORCHESTRATOR_TAGS: process.env.ORCHESTRATOR_TAGS || 'collaborative,ai-generated',
       },
       error_file: path.join(ROOT, 'logs/error.log'),
-      out_file: path.join(ROOT, 'logs/out.log'),
-      log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      merge_logs: true,
-      time: true
+      out_file:   path.join(ROOT, 'logs/out.log'),
     },
-    {
-      name: 'joplin-wiki',
-      script: '/home/user/otterwiki-repo/joplin_wiki_server_v2.py',
-      cwd: '/home/user/otterwiki-repo',
-      interpreter: '/usr/bin/python3',
-      watch: false,
-      autorestart: true,
-      max_restarts: 10,
-      restart_delay: 3000,
-      env: { PYTHONUNBUFFERED: '1' },
-      error_file: '/home/user/otterwiki-repo/logs/wiki-error.log',
-      out_file: '/home/user/otterwiki-repo/logs/wiki-out.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      merge_logs: true,
-      time: true
-    }
-  ]
+  ],
 };
