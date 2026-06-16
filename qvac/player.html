@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chimera — Explainer</title>
+  <style>
+    :root {
+      --bg: #0A0A0A;
+      --fg: #F8F8F2;
+      --accent: #00F5FF;
+      --accent2: #39FF14;
+      --muted: #666;
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "DejaVu Sans Mono", "SF Mono", monospace;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh;
+    }
+    h1 {
+      font-size: 1.6rem; margin: 0 0 0.6rem 0;
+      color: var(--accent); letter-spacing: 1px;
+    }
+    p {
+      color: var(--muted); margin: 0 0 1.2rem 0; font-size: 0.85rem;
+    }
+    video {
+      border: 1px solid #222;
+      border-radius: 8px;
+      box-shadow: 0 0 40px rgba(0, 245, 255, 0.08);
+      max-width: 90vw; max-height: 80vh;
+      outline: none;
+    }
+    .controls {
+      margin-top: 1rem; display: flex; gap: 1rem;
+    }
+    a, button {
+      background: transparent; color: var(--accent2);
+      border: 1px solid var(--accent2);
+      border-radius: 4px; padding: 0.4rem 0.8rem;
+      font-family: inherit; font-size: 0.8rem; cursor: pointer;
+      text-decoration: none;
+    }
+    a:hover, button:hover {
+      background: rgba(57, 255, 20, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <h1>Chimera</h1>
+  <p>Inference by Day. Looking to the Moon by Night.</p>
+
+  <video src="final.mp4?v=5" controls preload="metadata" poster=""></video>
+
+  <div class="controls">
+    <button onclick="document.querySelector('video').play()">Play</button>
+    <button onclick="document.querySelector('video').pause()">Pause</button>
+    <a href="final.mp4" download>Download</a>
+    <a href="https://github.com/TerexitariusStomp/qvac-pear-miner-node" target="_blank">GitHub</a>
+  </div>
+</body>
+</html>

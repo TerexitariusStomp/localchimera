@@ -1,0 +1,16 @@
+node_modules/
+data/
+logs/
+*.log
+.env
+.DS_Store
+dist/
+build/
+frontend/dist/
+*.key
+*.pem
+__pycache__/
+*.pyc
+audio/
+audio_edge/
+audio_muxed/

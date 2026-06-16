@@ -1,0 +1,151 @@
+{
+  "node": {
+    "id": "02b8357bdd44fbb6bd12f2b07cc993ee",
+    "name": "QVAC-Pear Miner Node",
+    "version": "1.0.0"
+  },
+  "inference": {
+    "enabled": true,
+    "qvac": {
+      "endpoint": "local",
+      "models": [
+        "llama-2-7b",
+        "llama-2-13b"
+      ],
+      "maxConcurrent": 4
+    },
+    "idleTimeout": 300000
+  },
+  "miners": {
+    "enabled": true,
+    "parallelMode": true,
+    "priority": [
+      "cortensor",
+      "chutes",
+      "fortytwo",
+      "earnidle",
+      "routstr"
+    ],
+    "switchInterval": 60000,
+    "cortensor": {
+      "enabled": true,
+      "config": {
+        "walletAddress": "0xa2bCA2e01Fc1631e5577994404C4e3d742b284bf",
+        "network": "arbitrum-testnet",
+        "description": "Arbitrum testnet wallet address for Cortensor mining rewards",
+        "autoFundSweep": true
+      }
+    },
+    "chutes": {
+      "enabled": true,
+      "config": {
+        "network": "bittensor",
+        "description": "Bittensor multisig (auto-generated from EVM) for Chutes GPU compute rewards",
+        "multisigType": "substrate",
+        "multisigThreshold": "2-of-3",
+        "requiresK8s": true,
+        "stackCompatible": false,
+        "compatibilityMode": true,
+        "note": "Bittensor protocol multisig is shared across all apps. Funds are swept monthly and split between machine owner (70%) and app developer (30%).",
+        "autoFundSweep": true
+      }
+    },
+    "fortytwo": {
+      "enabled": true,
+      "config": {
+        "walletAddress": "0xa2bCA2e01Fc1631e5577994404C4e3d742b284bf",
+        "network": "evm",
+        "description": "EVM compatible wallet address for Fortytwo-Network mining rewards",
+        "autoFundSweep": true
+      }
+    },
+    "earnidle": {
+      "enabled": true,
+      "config": {
+        "walletAddress": "6ovcKVxdNHH1LradUS8T5gmYiYUGQPW8xtPhfp9ZhPXw",
+        "network": "solana",
+        "description": "Solana wallet address for Earnidle mining rewards",
+        "autoFundSweep": false
+      }
+    },
+    "routstr": {
+      "enabled": true,
+      "config": {
+        "network": "nostr",
+        "platform": "https://beta.platform.routstr.com/",
+        "walletType": "nip-60",
+        "description": "Nostr Cashu NIP-60 multisig (auto-generated from EVM) for Routstr AI inference routing rewards",
+        "multisigType": "cashu-p2sh",
+        "multisigThreshold": "2-of-3",
+        "note": "Nostr protocol multisig is shared across all apps. Funds are swept monthly and split between machine owner (70%) and app developer (30%).",
+        "autoFundSweep": true
+      }
+    }
+  },
+  "multisig": {
+    "enabled": true,
+    "machineOwnerAddress": "0xa2bCA2e01Fc1631e5577994404C4e3d742b284bf",
+    "evmMultisigAddress": "0xa2bCA2e01Fc1631e5577994404C4e3d742b284bf",
+    "revenueSplit": {
+      "machineOwner": 0.70,
+      "appDeveloper": 0.30
+    },
+    "weeklySweep": {
+      "enabled": true,
+      "dayOfWeek": 0,
+      "hour": 0,
+      "minute": 0,
+      "denialWindowHours": 48,
+      "description": "Collects all network funds into EVM collection multisig"
+    },
+    "monthlySweep": {
+      "enabled": true,
+      "dayOfMonth": 1,
+      "hour": 0,
+      "minute": 0,
+      "denialWindowHours": 48,
+      "description": "Distributes from EVM collection multisig: 70% machine owner, 30% app developer"
+    },
+    "protocolMultisigs": {
+      "nostr": {
+        "enabled": true,
+        "protocol": "cashu-nip60-p2sh",
+        "address": "npub1qvacprotocolmultisigabc123xyz789",
+        "threshold": 2,
+        "signers": 3
+      },
+      "bittensor": {
+        "enabled": true,
+        "protocol": "substrate-multisig",
+        "address": "5QVACProtocolMultisigBittensorXYZ123",
+        "threshold": 2,
+        "signers": 3
+      }
+    }
+  },
+  "scheduler": {
+    "enabled": true,
+    "nightStart": 20,
+    "nightEnd": 6,
+    "timezone": "UTC"
+  },
+  "p2p": {
+    "enabled": true,
+    "pear": {
+      "enabled": true,
+      "discovery": true
+    },
+    "hypercore": {
+      "storage": "./data/hypercore",
+      "replicate": true
+    }
+  },
+  "storage": {
+    "path": "./data",
+    "encryption": true
+  },
+  "auth": {
+    "method": "signin",
+    "required": true
+  }
+}

@@ -1,0 +1,38 @@
+# Dependencies
+**/node_modules/
+**/package-lock.json
+
+# Build output
+**/dist/
+**/build/
+**/target/
+
+# Logs & data
+**/logs/
+**/*.log
+**/data/
+
+# Media
+**/media/
+**/*.mp4
+**/*.mp3
+**/*.wav
+**/*.avi
+**/audio/
+**/audio_edge/
+**/audio_muxed/
+
+# Python
+**/__pycache__/
+**/*.pyc
+
+# Env & secrets
+**/.env
+**/*.key
+**/*.pem
+
+# OS
+.DS_Store
+
+# Git
+**/.git
