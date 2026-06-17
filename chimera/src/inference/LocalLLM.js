@@ -1,10 +1,10 @@
 import { Logger } from '../core/Logger.js';
 
 /**
- * LocalLLM — Pure QVAC-native local inference.
+ * LocalLLM — QVAC-native local inference via @qvac/sdk.
  *
- * Uses @qvac/sdk to load models and run inference locally.
- * Demo mode only if QVAC SDK is unavailable.
+ * Uses the official QVAC SDK streaming completion API.
+ * Falls back to demo content if the SDK is unavailable.
  */
 export class LocalLLM {
   constructor(config = {}) {
@@ -16,55 +16,34 @@ export class LocalLLM {
     };
     this.logger = new Logger('LocalLLM');
     this.qvac = null;
-    this.modelId = null;       // Kept loaded between requests
-    this._loading = null;      // Promise guard to avoid double-load
+    this.modelId = null;
+    this._loading = null;
+    this._qvacTimedOut = false;
   }
 
   async initialize() {
-    this.logger.info('Initializing LocalLLM (QVAC-native)...');
+    this.logger.info('Initializing LocalLLM (QVAC)...');
     try {
       this.qvac = await import('@qvac/sdk');
-      this.logger.info(`QVAC SDK loaded: ${Object.keys(this.qvac).slice(0, 5).join(', ')}...`);
-      // Pre-load model now so first request is fast
-      await this._ensureModelLoaded();
+      this.logger.info('QVAC SDK loaded.');
     } catch (e) {
-      this.logger.warn(`QVAC SDK not available (${e.message}) — demo mode active`);
+      this.logger.warn(`QVAC SDK not available: ${e.message}`);
       this.qvac = null;
     }
   }
 
-  async _ensureModelLoaded() {
-    if (this.modelId) return this.modelId;
-    if (this._loading) return this._loading;
-
-    this._loading = (async () => {
-      const { loadModel, LLAMA_3_2_1B_INST_Q4_0 } = this.qvac;
-      const modelSrc = this.config.qvacModelConst || LLAMA_3_2_1B_INST_Q4_0;
-      this.logger.info(`Loading QVAC model (once)...`);
-      this.modelId = await loadModel({
-        modelSrc,
-        modelType: 'llm',
-        onProgress: (p) => {
-          if (p.percent % 10 === 0) this.logger.info(`Model load: ${p.percent}%`);
-        },
-      });
-      this.logger.info(`QVAC model loaded and ready: ${this.modelId}`);
-      return this.modelId;
-    })();
-
-    try {
-      await this._loading;
-    } finally {
-      this._loading = null;
-    }
-    return this.modelId;
-  }
-
   async generate(prompt, options = {}) {
     const title = options.title || prompt.split('.')[0].slice(0, 60);
-    if (this.qvac) {
-      return this._generateQVAC(prompt, title);
+
+    if (this.qvac && !this._qvacTimedOut) {
+      try {
+        return await this._generateQVAC(prompt, title);
+      } catch (e) {
+        this.logger.warn(`QVAC generation failed: ${e.message}`);
+        this._qvacTimedOut = true;
+      }
     }
+
     return this._generateDemo(prompt, title);
   }
 
@@ -86,10 +65,51 @@ export class LocalLLM {
       { role: 'user', content: `Write a wiki page about: ${prompt}` }
     ];
 
-    const result = completion({ modelId, history, stream: false });
-    const body = await result.text;
+    const result = completion({
+      modelId,
+      history,
+      stream: true,
+      generationParams: { predict: 50, temp: 0.7 }
+    });
 
-    return { title, body: (body || '').trim(), source: 'qvac', model: this.config.model };
+    let body = '';
+    for await (const token of result.tokenStream) {
+      body += token;
+    }
+
+    if (!body) {
+      throw new Error('QVAC SDK completion produced no output');
+    }
+
+    return { title, body: body.trim(), source: 'qvac', model: this.config.model };
+  }
+
+  async _ensureModelLoaded() {
+    if (this.modelId) return this.modelId;
+    if (this._loading) return this._loading;
+
+    this._loading = (async () => {
+      const { loadModel, LLAMA_3_2_1B_INST_Q4_0 } = this.qvac;
+      const modelSrc = this.config.qvacModelConst || LLAMA_3_2_1B_INST_Q4_0;
+      this.logger.info(`Loading QVAC model (once)...`);
+      this.modelId = await loadModel({
+        modelSrc,
+        modelType: 'llm',
+        modelConfig: { device: 'cpu' },
+        onProgress: (p) => {
+          if (p.percent % 10 === 0) this.logger.info(`Model load: ${p.percent}%`);
+        },
+      });
+      this.logger.info(`QVAC model loaded and ready: ${this.modelId}`);
+      return this.modelId;
+    })();
+
+    try {
+      await this._loading;
+    } finally {
+      this._loading = null;
+    }
+    return this.modelId;
   }
 
   _generateDemo(prompt, title) {
@@ -115,7 +135,7 @@ export class LocalLLM {
 
   getStatus() {
     return {
-      qvacAvailable: !!this.qvac,
+      qvacAvailable: !!this.qvac && !this._qvacTimedOut,
       qvacExports: this.qvac ? Object.keys(this.qvac).slice(0, 5) : [],
       model: this.config.model,
     };

@@ -48,7 +48,8 @@ The QVAC-Pear Miner Node is a distributed system that combines AI inference with
 1. **CortensorMiner**: Decentralized AI network for proof-of-useful-work
 2. **ChutesMiner**: GPU mining with automatic validation
 3. **FortytwoMiner**: Decentralized AI inference network
-4. **EarnidleMiner**: Idle compute protocol for multiple venues
+4. **EarnidleMiner**: Idle compute protocol for multiple venues (Solana)
+5. **RoutstrMiner**: Nostr protocol mining via Cashu NIP-60 P2SH
 
 ### Authentication Layer
 

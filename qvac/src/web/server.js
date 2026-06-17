@@ -22,7 +22,7 @@ export class WebServer {
     this.nodeManager = nodeManager;
     this.logger = new Logger('WebServer');
     this.server = null;
-    this.port = 3000;
+    this.port = process.env.PORT || 3002;
     this.indexer = new MarkdownIndexer();
     this.orchestrator = new NodeOrchestrator();
   }
@@ -151,7 +151,7 @@ export class WebServer {
     const consentPath = path.join(process.cwd(), 'data', 'consent.json');
     try { await fs.access(consentPath); }
     catch { badRequest(res, 'Consent required'); return; }
-    ok(res, { downloadUrl: '/install/qvac-pear-miner-node-installer.sh' });
+    ok(res, { downloadUrl: '/install/qvac-chimera-installer.sh' });
   }
   
   async handleStatus(req, res) {
@@ -243,6 +243,52 @@ export class WebServer {
       message: `File saved. Wiki page generation started for category '${category}'.` });
   }
 
+  async handleConvertToMd(req, res) {
+    const boundary = extractBoundary(req);
+    if (!boundary) { badRequest(res, 'Missing multipart boundary'); return; }
+
+    const data = await readBody(req);
+    const parts = parseMultipart(data, boundary);
+    const filePart = parts.find(p => p.filename);
+    if (!filePart) { badRequest(res, 'No file uploaded'); return; }
+
+    const tmpDir = path.join(process.cwd(), 'tmp-uploads');
+    await fs.mkdir(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, `${Date.now()}-${filePart.filename}`);
+    await fs.writeFile(tmpPath, filePart.data);
+
+    try {
+      this.logger.info(`[markitdown] Converting ${filePart.filename}...`);
+      const { spawn } = await import('child_process');
+      const py = spawn('/usr/bin/python3', ['-c', `
+from markitdown import MarkItDown
+md = MarkItDown()
+result = md.convert("${tmpPath.replace(/"/g, '\\"')}")
+print(result.text_content)
+`], { timeout: 60000 });
+
+      let out = '', err = '';
+      py.stdout.on('data', d => { out += d; });
+      py.stderr.on('data', d => { err += d; });
+
+      await new Promise((resolve, reject) => {
+        py.on('close', code => {
+          if (code !== 0) reject(new Error(err || 'markitdown failed'));
+          else resolve();
+        });
+      });
+
+      // cleanup temp file
+      try { await fs.unlink(tmpPath); } catch (_) {}
+
+      ok(res, { filename: filePart.filename, markdown: out.trim() });
+    } catch (e) {
+      this.logger.error(`[markitdown] Failed: ${e.message}`);
+      try { await fs.unlink(tmpPath); } catch (_) {}
+      serverError(res, e);
+    }
+  }
+
   async handleLLMWikiDocs(req, res) {
     await this.indexer.ensureFresh();
     ok(res, this.indexer.listDocuments());
@@ -257,6 +303,18 @@ export class WebServer {
     ok(res, this.indexer.search(query, { tags, category }));
   }
 
+  async handleWikiStatus(req, res) {
+    const store = this.nodeManager?.dataStore;
+    const p2p = this.nodeManager?.p2pNetwork;
+    const llm = this.nodeManager?.localLLM;
+    ok(res, {
+      qvac: llm ? { available: true, ...llm.getStatus() } : { available: false },
+      hypercore: store ? { available: true, ...store.getStatus() } : { available: false },
+      pear: p2p ? { available: true, running: p2p.isRunning, peers: p2p.peers?.size || 0 } : { available: false },
+      wikiDir: path.join(process.cwd(), 'llmwiki-data')
+    });
+  }
+
   async handleLLMWikiGraph(req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const nodeId = url.searchParams.get('id') || '';
@@ -265,6 +323,123 @@ export class WebServer {
       ? this.indexer.graph(nodeId)
       : { nodes: this.indexer.documents.length, links: this.indexer.links.length };
     ok(res, result);
+  }
+
+  async handleLLMWikiSave(req, res) {
+    const body = await parseBody(req);
+    const { content = '', title = 'Untitled', category = 'concepts', tags = [] } = body;
+    if (!content.trim()) { badRequest(res, 'content is required'); return; }
+
+    const slug = title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const fileName = `${slug || 'untitled'}.md`;
+    const wikiDir = path.join(process.cwd(), 'llmwiki-data', 'wiki', category);
+    const filePath = path.join(wikiDir, fileName);
+
+    const frontmatter = `---\ntitle: ${title}\ndescription: AI-generated wiki page\ndate: ${new Date().toISOString().split('T')[0]}\ntags: ${JSON.stringify(tags)}\n---\n\n`;
+
+    try {
+      await fs.mkdir(wikiDir, { recursive: true });
+      await fs.writeFile(filePath, frontmatter + content, 'utf-8');
+      this.logger.info(`[llmwiki] Saved ${filePath}`);
+
+      // ─── Hypercore persistence ───
+      if (this.nodeManager?.dataStore) {
+        const seq = await this.nodeManager.dataStore.append({
+          type: 'wiki-page',
+          title,
+          category,
+          tags,
+          content: frontmatter + content,
+          filePath,
+          createdAt: Date.now()
+        });
+        this.logger.info(`[llmwiki] Hypercore append seq ${seq}`);
+      }
+
+      // ─── Pear P2P broadcast ───
+      const p2p = this.nodeManager?.p2pNetwork;
+      if (p2p) {
+        const pageId = `${category}/${fileName}`;
+        const msg = { type: 'wiki-new-page', title, category, fileName, content: frontmatter + content, tags, timestamp: Date.now() };
+
+        // Broadcast to wiki-wide swarms
+        const wikiTopics = p2p.getTopicsByScope('wiki');
+        if (wikiTopics.length > 0) {
+          await p2p.broadcastToTopics(msg, { scope: 'wiki', pageId });
+          this.logger.info(`[llmwiki] Broadcast to ${wikiTopics.length} wiki swarm(s): ${title}`);
+        }
+
+        // Broadcast to page-specific swarms
+        const pageTopics = p2p.getTopicsByScope('page', pageId);
+        if (pageTopics.length > 0) {
+          await p2p.broadcastToTopics(msg, { scope: 'page', pageId });
+          this.logger.info(`[llmwiki] Broadcast to ${pageTopics.length} page swarm(s): ${title}`);
+        }
+      }
+
+      // Refresh index so it appears immediately
+      await this.indexer.index();
+      ok(res, { id: `${category}/${fileName}`, title, path: `/${category}/${fileName}`, category, tags });
+    } catch (e) {
+      this.logger.error(`[llmwiki] Save failed: ${e.message}`);
+      serverError(res, e);
+    }
+  }
+
+  /* ─── Swarm / P2P Handlers ─── */
+
+  async handleSwarmCreate(req, res) {
+    const p2p = this.nodeManager?.p2pNetwork;
+    if (!p2p) { serviceUnavailable(res, 'P2P not initialized'); return; }
+
+    const body = await parseBody(req);
+    const scope = body.scope || 'wiki'; // 'wiki' | 'page'
+    const pageId = body.pageId || null;
+    const pageTitle = body.pageTitle || null;
+
+    const topic = p2p.generateTopic();
+    const topicHex = await p2p.joinTopic(topic, { scope, pageId, title: pageTitle });
+    const inviteUrl = `${req.headers.origin || `http://${req.headers.host}`}/api/swarm/join?topic=${topicHex}`;
+
+    ok(res, {
+      topic: topicHex,
+      shortTopic: topicHex.slice(0, 16) + '...',
+      scope,
+      pageId,
+      inviteUrl,
+      message: scope === 'page'
+        ? `Share the topic hex to collaborate on this page only.`
+        : `Share the topic hex to sync the entire wiki.`
+    });
+  }
+
+  async handleSwarmJoin(req, res) {
+    const p2p = this.nodeManager?.p2pNetwork;
+    if (!p2p) { serviceUnavailable(res, 'P2P not initialized'); return; }
+
+    const body = await parseBody(req);
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const topicHex = body.topic || url.searchParams.get('topic') || '';
+    if (!topicHex || topicHex.length !== 64) { badRequest(res, 'Valid 64-char topic hex required'); return; }
+
+    try {
+      const joinedHex = await p2p.joinTopic(Buffer.from(topicHex, 'hex'), { scope: body.scope || 'wiki', pageId: body.pageId || null });
+      ok(res, { topic: joinedHex, status: 'joined', peers: p2p.peers.size });
+    } catch (e) {
+      this.logger.error(`[swarm] Join failed: ${e.message}`);
+      serverError(res, e);
+    }
+  }
+
+  async handleSwarmStatus(req, res) {
+    const p2p = this.nodeManager?.p2pNetwork;
+    if (!p2p) { ok(res, { available: false }); return; }
+    ok(res, {
+      available: true,
+      running: p2p.isRunning,
+      peers: p2p.peers.size,
+      topics: p2p.getTopicList()
+    });
   }
 
   /* ─── Orchestrator Handlers ─── */

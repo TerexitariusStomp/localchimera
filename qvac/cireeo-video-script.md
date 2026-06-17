@@ -1,7 +1,7 @@
 # Cireeo.ai Video Script — QVAC-Pear Miner Node
 
 ## Project
-**Repo:** https://github.com/TerexitariusStomp/qvac-pear-miner-node  
+**Repo:** https://github.com/TerexitariusStomp/qvac-chimera  
 **Tone:** Technical but accessible, futuristic, builder-focused  
 **Target Length:** ~2 minutes  
 **Style:** Codebase walkthrough / architecture explainer
@@ -46,7 +46,7 @@
 
 > "For mining, the MinerManager runs all five protocols in parallel monitoring mode. When a task arrives, the TaskMonitor instantly notifies every miner to free up resources."
 
-> "And for scheduling, a TimeScheduler automatically switches between day mode — inference earning — and night mode — like the Stellar astronomy app integration, where your phone becomes a sky sensor."
+> "And for scheduling, a TimeScheduler automatically switches between day mode — inference earning — and night mode — where the AI Writer goes idle and your machine maximizes mining across all five protocols."
 
 **Code citation:** `src/core/NodeManager.js:34-95`
 
@@ -127,7 +127,7 @@
 | P2P | `src/p2p/PearP2P.js` | Pear runtime + Hyperswarm |
 | Miners | `src/miners/MinerManager.js` | 5-protocol orchestration |
 | Scheduler | `src/scheduler/TimeScheduler.js` | Day/night mode switching |
-| Frontend | `frontend/src/pages/StellarExample.jsx` | Mobile PWA + AI companion UI |
+| Frontend | `frontend/src/pages/AIWriter.jsx` | Mobile PWA + AI writing UI |
 | Config | `config.json` | Protocol multisigs, miner wallets, splits |
 
 ## Keywords for Cireeo AI
@@ -137,7 +137,7 @@ Use these to guide auto-generated visuals:
 - "dark terminal with green logs"
 - "blockchain flowchart, glowing nodes"
 - "split screen day and night cycle"
-- "astronomy smartphone app, star field"
+- "AI writing interface, glowing text cursor, dark terminal"
 - "Docker containers stacking"
 - "abstract AI neural network visualization"
 - "cryptographic key shards forming a lock"

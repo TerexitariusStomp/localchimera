@@ -141,8 +141,8 @@ This node integrates:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/qvac-pear-miner-node.git
-cd qvac-pear-miner-node
+git clone https://github.com/your-org/qvac-chimera.git
+cd qvac-chimera
 
 # Build and run with Docker Compose
 docker-compose up -d

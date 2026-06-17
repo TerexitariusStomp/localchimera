@@ -6,7 +6,7 @@ set -e
 
 IMAGE_NAME="qvac-pear-miner"
 IMAGE_TAG="latest"
-CONTAINER_NAME="qvac-pear-miner-node"
+CONTAINER_NAME="qvac-chimera"
 
 echo "🐳 Building QVAC-Pear Miner Node Docker image..."
 echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"

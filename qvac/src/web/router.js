@@ -16,9 +16,16 @@ export const ROUTES = [
   // LLM Wiki
   ['POST', '/api/llmwiki-create',     'handleLLMWikiCreate'],
   ['POST', '/api/llmwiki-upload',     'handleLLMWikiUpload'],
+  ['POST', '/api/convert-to-md',      'handleConvertToMd'],
+  ['POST', '/api/llmwiki-save',       'handleLLMWikiSave'],
   ['GET',  '/api/llmwiki-docs',       'handleLLMWikiDocs'],
   ['GET',  '/api/llmwiki-search',     'handleLLMWikiSearch'],
   ['GET',  '/api/llmwiki-graph',      'handleLLMWikiGraph'],
+  ['GET',  '/api/wiki-status',        'handleWikiStatus'],
+  // Swarm
+  ['POST', '/api/swarm/create',        'handleSwarmCreate'],
+  ['POST', '/api/swarm/join',          'handleSwarmJoin'],
+  ['GET',  '/api/swarm/status',        'handleSwarmStatus'],
   // Fleet Orchestrator
   ['POST', '/api/commander/register', 'handleCommanderRegister'],
   ['GET',  '/api/commander/workers',  'handleCommanderWorkers'],

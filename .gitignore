@@ -21,6 +21,8 @@
 **/audio/
 **/audio_edge/
 **/audio_muxed/
+viral_frames/
+**/video_frames/
 
 # Python
 **/__pycache__/

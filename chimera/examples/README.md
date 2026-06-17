@@ -1,42 +1,42 @@
-# Stellar Integration Example
+# AI Writer Integration Example
 
 This directory contains integration examples for the QVAC-Pear Miner Node.
 
-## Stellar App Integration
+## AI Writer Integration
 
-The Stellar app integration demonstrates time-based resource allocation:
+The AI Writer integration demonstrates session-based resource allocation for collaborative content generation:
 
-### Night Mode (8 PM - 6 AM)
-- Stellar app is active for astronomy observations
-- Device camera used for sky sensing
-- On-device AI processes celestial images
+### Active Session (User Writing)
+- AI Writer app is active for content generation
+- Device uses local LLM for inference
+- On-device AI processes writing prompts
 - Miners run in parallel monitoring mode
-- Inference tasks paused to prioritize Stellar
+- Mining paused temporarily during heavy generation
 
-### Day Mode (6 AM - 8 PM)
-- Stellar app is inactive
-- Device available for inference earning
+### Idle Session (No User Input)
+- AI Writer app is idle after 5-minute timeout
+- Device available for multi-protocol mining
 - All miners monitor for inference tasks in parallel
 - Immediate detection and response to inference requests
-- Maximum earning potential during daylight hours
+- Maximum earning potential during idle periods
 
 ### Key Features
 
-1. **Automatic Mode Switching**: Time-based scheduler automatically switches between night and day modes
-2. **Parallel Miner Monitoring**: All four miners (Cortensor, Chutes, Fortytwo, Earnidle) monitor simultaneously
+1. **Session-Based Switching**: Automatically detects active vs idle user sessions
+2. **Parallel Miner Monitoring**: All five miners (Cortensor, Chutes, Fortytwo, Earnidle, Routstr) monitor simultaneously
 3. **Immediate Task Detection**: Task monitor notifies all miners instantly when inference tasks arrive
-4. **Resource Optimization**: Device resources allocated based on time of day and app usage
+4. **Resource Optimization**: Device resources allocated based on user activity
 
 ### Running the Example
 
 ```bash
-node examples/stellar-integration.js
+node examples/aiwriter-integration.js
 ```
 
 ### Configuration
 
 Edit `config.json` to customize:
-- Night/day hours (default: 8 PM - 6 AM)
+- Idle timeout (default: 5 minutes)
 - Parallel monitoring mode
 - Miner priorities
 - Inference settings
@@ -45,20 +45,20 @@ Edit `config.json` to customize:
 
 ```
 ┌─────────────────────────────────────────────────┐
-│           Time Scheduler                        │
-│    (Automatically switches night/day)           │
+│           Session Manager                       │
+│    (Detects active / idle state)                │
 └────────────────┬────────────────────────────────┘
                  │
         ┌────────┴────────┐
         │                 │
 ┌───────▼──────┐  ┌──────▼──────┐
-│  Night Mode   │  │  Day Mode   │
+│ Active Mode   │  │ Idle Mode   │
 │               │  │             │
-│ Stellar App  │  │ Inference   │
-│ Active       │  │ Earning     │
-│               │  │             │
-│ Sky Sensing  │  │ All Miners  │
-│ AI Processing│  │ Monitoring  │
+│ AI Writer    │  │ Multi-      │
+│ Generating   │  │ Protocol    │
+│               │  │ Mining      │
+│ LLM Inference│  │ All Miners  │
+│ Wiki Save    │  │ Monitoring  │
 └───────────────┘  └─────────────┘
         │                 │
         └────────┬────────┘
@@ -71,25 +71,25 @@ Edit `config.json` to customize:
          │
     ┌────┴────┐
     │         │
-┌───▼───┐ ┌──▼────┐ ┌───▼───┐ ┌───▼───┐
-│Cortensor│ │Chutes │ │Fortytwo│ │Earnidle│
-│         │ │       │ │        │ │        │
-│Monitoring│ │Monitoring│ │Monitoring│ │Monitoring│
-└─────────┘ └────────┘ └────────┘ └────────┘
+┌───▼───┐ ┌──▼────┐ ┌───▼───┐ ┌───▼───┐ ┌───▼───┐
+│Cortensor│ │Chutes │ │Fortytwo│ │Earnidle│ │Routstr │
+│         │ │       │ │        │ │        │ │        │
+│Monitoring│ │Monitoring│ │Monitoring│ │Monitoring│ │Monitoring│
+└─────────┘ └────────┘ └────────┘ └────────┘ └────────┘
 ```
 
-### Integration with Stellar App
+### Integration with AI Writer
 
-The Stellar app (https://github.com/Rezimod/Stellar) integrates with QVAC for on-device AI:
+The AI Writer uses QVAC Inference Layer for on-device LLM generation:
 
-1. **QVAC Integration**: Stellar uses QVAC SDK for local AI inference
-2. **Dark Sky Sites**: Optimized for astronomy observations at night
-3. **Rewards**: Users earn tokens for contributing sky data
-4. **Solana Blockchain**: Built on Solana for reward distribution
+1. **QVAC Integration**: Uses QVAC SDK for local LLM inference (Llama models)
+2. **Wiki Generation**: Saves articles to distributed Hypercore storage
+3. **Rewards**: Contributors earn for high-quality generated content
+4. **Peer Sync**: Articles sync across the Pear P2P network
 
 ### Benefits
 
-- **Maximized Earning**: Earn from inference during day, Stellar rewards at night
+- **Dual Earning**: Earn from content contributions and mining when idle
 - **Resource Efficiency**: No resource conflicts between apps
 - **Automatic Operation**: No manual switching required
 - **Parallel Monitoring**: Never miss inference opportunities
@@ -97,8 +97,8 @@ The Stellar app (https://github.com/Rezimod/Stellar) integrates with QVAC for on
 
 ### Future Enhancements
 
-- GPU resource sharing between Stellar and inference
-- Dynamic mode switching based on weather
-- Multi-node coordination for large astronomy projects
-- Real-time earning dashboard
-- Mobile app support
+- GPU resource sharing between writing and mining
+- Collaborative editing across peer nodes
+- Voice-to-text integration for mobile
+- Real-time word-count and earning dashboard
+- Template library for common document types

@@ -1,5 +1,5 @@
 import { Logger } from '../core/Logger.js';
-import { createServer } from 'http';
+import { createServer, request as httpRequest } from 'http';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -90,6 +90,27 @@ export class WebServer {
       return;
     } else if (url.pathname === '/api/stop' && req.method === 'POST') {
       await this.handleStop(req, res);
+      return;
+    } else if (url.pathname === '/api/wiki-pages' && req.method === 'GET') {
+      await this.handleWikiPages(req, res);
+      return;
+    } else if (url.pathname.startsWith('/api/wiki-pages/') && req.method === 'GET') {
+      await this.handleWikiPageGet(req, res, url.pathname.replace('/api/wiki-pages/', ''));
+      return;
+    } else if (url.pathname === '/api/wiki-pages' && req.method === 'POST') {
+      await this.handleWikiPageSave(req, res);
+      return;
+    } else if (url.pathname.startsWith('/api/wiki-pages/') && req.method === 'DELETE') {
+      await this.handleWikiPageDelete(req, res, url.pathname.replace('/api/wiki-pages/', ''));
+      return;
+    } else if (url.pathname.startsWith('/api/wiki-pages/') && url.pathname.endsWith('/sync-joplin') && req.method === 'POST') {
+      await this.handleWikiPageSyncJoplin(req, res, url.pathname.replace('/api/wiki-pages/', '').replace('/sync-joplin', ''));
+      return;
+    } else if (url.pathname === '/api/joplin/notes' && req.method === 'GET') {
+      await this.handleJoplinNotes(req, res);
+      return;
+    } else if (url.pathname === '/api/joplin/sync' && req.method === 'POST') {
+      await this.handleJoplinSync(req, res);
       return;
     }
 
@@ -200,7 +221,7 @@ export class WebServer {
       res.end(JSON.stringify({ 
         success: true, 
         message: 'Download link would be provided here',
-        downloadUrl: '/install/qvac-pear-miner-node-installer.sh'
+        downloadUrl: '/install/qvac-chimera-installer.sh'
       }));
     } catch (error) {
       this.logger.error('Error handling download:', error);
@@ -399,6 +420,190 @@ export class WebServer {
       this.logger.error('Error handling stop:', error);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: error.message }));
+    }
+  }
+
+  // ─── Wiki Pages ───
+  async handleWikiPages(req, res) {
+    try {
+      const wikiDir = path.join(process.cwd(), 'data', 'wiki-pages');
+      const pages = [];
+      try {
+        const entries = await fs.readdir(wikiDir);
+        for (const entry of entries.filter(e => e.endsWith('.md'))) {
+          const content = await fs.readFile(path.join(wikiDir, entry), 'utf-8');
+          const titleMatch = content.match(/^#\s(.+)$/m);
+          const stat = await fs.stat(path.join(wikiDir, entry));
+          pages.push({ id: entry.replace('.md', ''), title: titleMatch ? titleMatch[1] : entry.replace('.md', ''), updatedAt: stat.mtime.getTime() });
+        }
+      } catch { /* dir may not exist */ }
+      pages.sort((a, b) => b.updatedAt - a.updatedAt);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: true, data: pages }));
+    } catch (error) {
+      this.logger.error('Error listing wiki pages:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: error.message }));
+    }
+  }
+
+  async handleWikiPageGet(req, res, pageId) {
+    try {
+      const wikiDir = path.join(process.cwd(), 'data', 'wiki-pages');
+      const filePath = path.join(wikiDir, `${pageId}.md`);
+      let content = '';
+      try { content = await fs.readFile(filePath, 'utf-8'); } catch {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Page not found' }));
+        return;
+      }
+      const titleMatch = content.match(/^#\s(.+)$/m);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: true, data: { id: pageId, title: titleMatch ? titleMatch[1] : pageId, content, updatedAt: (await fs.stat(filePath)).mtime.getTime() } }));
+    } catch (error) {
+      this.logger.error('Error getting wiki page:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: error.message }));
+    }
+  }
+
+  async handleWikiPageSave(req, res) {
+    try {
+      const body = await this.parseBody(req);
+      const { id, title, content } = body;
+      if (!id || !content) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'id and content are required' }));
+        return;
+      }
+      const wikiDir = path.join(process.cwd(), 'data', 'wiki-pages');
+      await fs.mkdir(wikiDir, { recursive: true });
+      const filePath = path.join(wikiDir, `${id}.md`);
+      const mdContent = content.startsWith('# ') ? content : `# ${title || id}\n\n${content}`;
+      await fs.writeFile(filePath, mdContent);
+      if (this.nodeManager?.dataStore) {
+        await this.nodeManager.dataStore.append({ type: 'wiki-page', id, title: title || id, content: mdContent, timestamp: Date.now() });
+      }
+      this.logger.info(`Wiki page saved: ${id}`);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: true, data: { id, title: title || id } }));
+    } catch (error) {
+      this.logger.error('Error saving wiki page:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: error.message }));
+    }
+  }
+
+  async handleWikiPageDelete(req, res, pageId) {
+    try {
+      const wikiDir = path.join(process.cwd(), 'data', 'wiki-pages');
+      const filePath = path.join(wikiDir, `${pageId}.md`);
+      try { await fs.unlink(filePath); } catch { }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.logger.error('Error deleting wiki page:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: error.message }));
+    }
+  }
+
+  // ─── Joplin Helpers ───
+  async joplinRequest(endpoint, method = 'GET', body = null) {
+    return new Promise((resolve, reject) => {
+      const token = process.env.JOPLIN_TOKEN || '102746798bf0b619bcf42b2a3f9bd5c286d0720eabb98916ca40db2f4564f9be';
+      const options = { hostname: 'localhost', port: 41184, path: `${endpoint}?token=${token}`, method, headers: {} };
+      if (body) { options.headers['Content-Type'] = 'application/json'; }
+      const reqJ = httpRequest(options, (resJ) => {
+        let data = '';
+        resJ.on('data', chunk => data += chunk);
+        resJ.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(data); } });
+      });
+      reqJ.on('error', reject);
+      if (body) reqJ.write(JSON.stringify(body));
+      reqJ.end();
+    });
+  }
+
+  async handleWikiPageSyncJoplin(req, res, pageId) {
+    try {
+      const wikiDir = path.join(process.cwd(), 'data', 'wiki-pages');
+      const filePath = path.join(wikiDir, `${pageId}.md`);
+      let content = '';
+      try { content = await fs.readFile(filePath, 'utf-8'); } catch {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Page not found' }));
+        return;
+      }
+      const titleMatch = content.match(/^#\s(.+)$/m);
+      const title = titleMatch ? titleMatch[1] : pageId;
+      // Create note in Joplin
+      const note = await this.joplinRequest('/notes', 'POST', { title, body: content });
+      this.logger.info(`Synced wiki page ${pageId} to Joplin note ${note?.id}`);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: true, data: note }));
+    } catch (error) {
+      this.logger.error('Error syncing to Joplin:', error);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: false, error: error.message || 'Joplin not available' }));
+    }
+  }
+
+  async handleJoplinNotes(req, res) {
+    try {
+      const notes = await this.joplinRequest('/notes');
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: true, data: notes || [] }));
+    } catch (error) {
+      this.logger.error('Error fetching Joplin notes:', error);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: false, error: error.message || 'Joplin not available', data: [] }));
+    }
+  }
+
+  async handleJoplinSync(req, res) {
+    try {
+      const body = await this.parseBody(req);
+      const direction = body.direction || 'both'; // 'to-joplin', 'from-joplin', 'both'
+      let synced = 0;
+
+      if (direction === 'to-joplin' || direction === 'both') {
+        const wikiDir = path.join(process.cwd(), 'data', 'wiki-pages');
+        try {
+          const entries = await fs.readdir(wikiDir);
+          for (const entry of entries.filter(e => e.endsWith('.md'))) {
+            const content = await fs.readFile(path.join(wikiDir, entry), 'utf-8');
+            const titleMatch = content.match(/^#\s(.+)$/m);
+            const title = titleMatch ? titleMatch[1] : entry.replace('.md', '');
+            await this.joplinRequest('/notes', 'POST', { title, body: content });
+            synced++;
+          }
+        } catch { }
+      }
+
+      if (direction === 'from-joplin' || direction === 'both') {
+        const notes = await this.joplinRequest('/notes');
+        const items = notes?.items || notes || [];
+        const wikiDir = path.join(process.cwd(), 'data', 'wiki-pages');
+        await fs.mkdir(wikiDir, { recursive: true });
+        for (const note of items) {
+          const id = (note.title || 'untitled').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+          const filePath = path.join(wikiDir, `${id}.md`);
+          await fs.writeFile(filePath, `# ${note.title}\n\n${note.body || ''}`);
+          if (this.nodeManager?.dataStore) {
+            await this.nodeManager.dataStore.append({ type: 'wiki-page', id, title: note.title, content: note.body || '', timestamp: Date.now(), source: 'joplin' });
+          }
+          synced++;
+        }
+      }
+
+      this.logger.info(`Joplin sync complete: ${synced} items`);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: true, data: { synced } }));
+    } catch (error) {
+      this.logger.error('Error during Joplin sync:', error);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ success: false, error: error.message || 'Joplin not available' }));
     }
   }
 

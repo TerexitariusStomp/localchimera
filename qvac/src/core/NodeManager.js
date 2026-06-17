@@ -107,7 +107,41 @@ export class NodeManager {
     
     // Start P2P network
     await this.p2pNetwork.start();
-    
+
+    // Register P2P message handler for incoming wiki pages
+    this.p2pNetwork.onMessage('wiki-sync', async (msg, peerId) => {
+      if (msg.type !== 'wiki-new-page') return;
+
+      // Scope filtering: page-scoped messages only apply if we joined that page's swarm
+      const swarmScope = msg._swarmScope || 'wiki';
+      const msgPageId = msg._pageId || `${msg.category}/${msg.fileName}`;
+      if (swarmScope === 'page') {
+        const pageTopics = this.p2pNetwork.getTopicsByScope('page', msgPageId);
+        if (pageTopics.length === 0) {
+          this.logger.debug(`[swarm] Ignoring page-scoped message for ${msgPageId} — not in swarm`);
+          return;
+        }
+      }
+
+      this.logger.info(`[swarm] Received wiki page from peer ${peerId}: ${msg.title} (scope: ${swarmScope})`);
+      const { title, category = 'concepts', content, tags = [] } = msg;
+      try {
+        const fs = await import('fs').then(m => m.promises);
+        const path = await import('path');
+        const slug = (title || 'untitled').toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        const fileName = `${slug || 'untitled'}.md`;
+        const wikiDir = path.join(process.cwd(), 'llmwiki-data', 'wiki', category);
+        await fs.mkdir(wikiDir, { recursive: true });
+        const filePath = path.join(wikiDir, fileName);
+        const frontmatter = `---\ntitle: ${title}\ndescription: AI-generated wiki page\ndate: ${new Date().toISOString().split('T')[0]}\ntags: ${JSON.stringify(tags)}\n---\n\n`;
+        await fs.writeFile(filePath, frontmatter + (content || ''), 'utf-8');
+        this.logger.info(`[swarm] Saved ${filePath}`);
+        if (this.webServer?.indexer) await this.webServer.indexer.index();
+      } catch (e) {
+        this.logger.error(`[swarm] Failed to save incoming page: ${e.message}`);
+      }
+    });
+
     // Connect wallet manager
     await this.walletManager.connectAllWallets();
     
@@ -158,8 +192,8 @@ export class NodeManager {
     this.logger.info(`Mode changed to: ${newMode}`);
     
     if (newMode === 'night') {
-      // Night mode: Stellar app active, miners in monitoring mode
-      this.logger.info('Night mode: Stellar app active, miners monitoring');
+      // Night mode: AI Writer idle, miners in monitoring mode
+      this.logger.info('Night mode: AI Writer idle, miners monitoring');
     } else {
       // Day mode: Inference earning active
       this.logger.info('Day mode: Inference earning active');

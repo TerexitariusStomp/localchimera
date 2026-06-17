@@ -16,13 +16,15 @@ import {
   Clock,
   Award,
   Camera,
-  Download
+  Download,
+  Smartphone
 } from 'lucide-react'
-import StellarExample from './StellarExample'
+import AIWriterExample from './AIWriterExample'
 
-export default function Landing({ onNavigateToDashboard, onNavigateToMiner }) {
+export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNavigateToAIWriter }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [installPrompt, setInstallPrompt] = useState(null)
+  const [mobileOS, setMobileOS] = useState(null)
 
   useEffect(() => {
     const handler = (e) => {
@@ -30,6 +32,11 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner }) {
       setInstallPrompt(e)
     }
     window.addEventListener('beforeinstallprompt', handler)
+
+    const ua = navigator.userAgent
+    if (/Android/i.test(ua)) setMobileOS('android')
+    else if (/iPhone|iPad|iPod/i.test(ua)) setMobileOS('ios')
+
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
@@ -51,7 +58,7 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner }) {
                 <Zap className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">QVAC-Pear Miner Node</h1>
+                <h1 className="text-xl font-bold text-white">Chimera</h1>
                 <p className="text-sm text-dark-400">Distributed AI Inference & Mining</p>
               </div>
             </div>
@@ -65,18 +72,22 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner }) {
                   <span className="hidden sm:inline">Install App</span>
                 </button>
               )}
-              <button
-                onClick={() => onNavigateToDashboard && onNavigateToDashboard()}
-                className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-colors"
+              {onNavigateToAIWriter && (
+                <button
+                  onClick={onNavigateToAIWriter}
+                  className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-colors text-sm"
+                >
+                  AI Writer
+                </button>
+              )}
+              <a
+                href="https://github.com/TerexitariusStomp/qvac-chimera"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg font-medium transition-colors text-sm"
               >
-                View Dashboard
-              </button>
-              <button
-                onClick={() => onNavigateToMiner && onNavigateToMiner()}
-                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors hidden sm:block"
-              >
-                Launch Miner
-              </button>
+                GitHub
+              </a>
             </div>
           </div>
         </div>
@@ -86,36 +97,55 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner }) {
       <section className="container mx-auto px-6 py-20">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-5xl font-bold text-white mb-6">
-            Distributed AI Inference & Mining Node
+            Chimera
           </h1>
           <p className="text-xl text-dark-300 mb-8 max-w-2xl mx-auto">
-            A powerful node that combines QVAC for local AI inference, Pear for P2P distribution, 
+            A powerful node that combines QVAC for local AI inference, Pear for P2P distribution,
             Hypercore for data storage, and multi-miner support with parallel monitoring.
           </p>
-          <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={() => onNavigateToDashboard && onNavigateToDashboard()}
-              className="px-8 py-3 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white rounded-lg font-medium transition-all flex items-center gap-2"
-            >
-              Launch Dashboard
-              <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onNavigateToMiner && onNavigateToMiner()}
-              className="px-8 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg font-medium transition-all flex items-center gap-2"
-            >
-              Launch Miner
-              <Zap className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setActiveTab('features')}
-              className="px-8 py-3 bg-dark-700 hover:bg-dark-600 text-white rounded-lg font-medium transition-colors"
-            >
-              Learn More
-            </button>
-          </div>
         </div>
       </section>
+
+      {/* Mobile Download Banner */}
+      {mobileOS && (
+        <section className="container mx-auto px-6 pb-16">
+          <div className="max-w-2xl mx-auto">
+            <div className="card bg-gradient-to-r from-indigo-900/50 to-purple-900/50 border-indigo-500/30">
+              <div className="flex items-center gap-3 mb-3">
+                <Smartphone className="w-6 h-6 text-primary-400" />
+                <h2 className="text-xl font-bold text-white">
+                  {mobileOS === 'android' ? 'Download Chimera Miner for Android' : 'Get Chimera Miner for iPhone'}
+                </h2>
+              </div>
+              <p className="text-sm text-dark-300 mb-4">
+                {mobileOS === 'android'
+                  ? 'Install the APK directly on your Android device. No Docker required — the app runs natively and auto-configures miners.'
+                  : 'Install on your iPhone. The iOS build connects directly to the mining network via Pear P2P.'}
+              </p>
+              <div className="flex gap-3 flex-wrap">
+                {mobileOS === 'android' ? (
+                  <a
+                    href="./chimera-miner.apk"
+                    download
+                    className="px-5 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors inline-flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" /> Download APK
+                  </a>
+                ) : (
+                  <a
+                    href="https://testflight.apple.com/join/chimera-miner"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors inline-flex items-center gap-2"
+                  >
+                    <Smartphone className="w-4 h-4" /> Join TestFlight
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Key Features */}
       <section className="container mx-auto px-6 py-16">
@@ -346,124 +376,9 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner }) {
         </div>
       </section>
 
-      {/* Getting Started Section */}
+      {/* AI Writer Integration Section - INLINE ON LANDING PAGE */}
       <section className="container mx-auto px-6 py-16">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-white text-center mb-12">
-            Getting Started
-          </h2>
-
-          <div className="space-y-6">
-            <div className="card">
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-bold">1</span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Install Dependencies</h3>
-                  <div className="bg-dark-900 rounded-lg p-4 font-mono text-sm text-primary-300">
-                    npm install
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-bold">2</span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Initialize Node</h3>
-                  <div className="bg-dark-900 rounded-lg p-4 font-mono text-sm text-primary-300">
-                    npm run init
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-bold">3</span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Start Node</h3>
-                  <div className="bg-dark-900 rounded-lg p-4 font-mono text-sm text-primary-300">
-                    npm start
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-bold">4</span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">View Dashboard</h3>
-                  <p className="text-sm text-dark-400 mb-2">
-                    Open the dashboard to monitor your node status, miners, and real-time metrics.
-                  </p>
-                  <button 
-                    onClick={() => onNavigateToDashboard && onNavigateToDashboard()}
-                    className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-colors"
-                  >
-                    Launch Dashboard
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Embed Integration Section */}
-      <section className="container mx-auto px-6 py-16">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-white text-center mb-4">
-            One-Line Integration
-          </h2>
-          <p className="text-center text-dark-300 mb-8">
-            App publishers can embed distributed AI inference with a single script tag.
-          </p>
-
-          <div className="card">
-            <p className="text-sm text-dark-400 mb-3">
-              Paste this into any HTML, WebView, or Android APK layout. The script auto-detects idle compute,
-              registers with the mining coordinator using your EVM address, and begins processing inference tasks.
-            </p>
-            <div className="bg-dark-900 rounded-lg p-4 font-mono text-sm text-green-300 overflow-x-auto whitespace-pre-wrap">
-{`<script
-  src="./inference-embed.js"
-  data-app-id="your-app-id"
-  data-evm-address="0x..."
-  auto-install>
-</script>`}
-            </div>
-            <div className="flex gap-3 mt-4 flex-wrap">
-              <a
-                href="./embed-demo.html"
-                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors inline-flex items-center gap-2"
-              >
-                <Zap className="w-4 h-4" /> Live Demo & Docs
-              </a>
-              <a
-                href="./inference-embed.js"
-                download
-                className="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg font-medium transition-colors inline-flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" /> Download Script
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stellar Field Integration Section - INLINE ON LANDING PAGE */}
-      <section className="container mx-auto px-6 py-16">
-        <StellarExample onNavigateBack={() => {}} onNavigateToDashboard={onNavigateToDashboard} />
+        <AIWriterExample onNavigateBack={() => {}} onNavigateToDashboard={onNavigateToDashboard} />
       </section>
 
       {/* Tech Stack Section */}
@@ -517,7 +432,7 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner }) {
               <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center">
                 <Zap className="w-4 h-4 text-white" />
               </div>
-              <span className="text-sm text-dark-400">QVAC-Pear Miner Node</span>
+              <span className="text-sm text-dark-400">Chimera</span>
             </div>
             <div className="flex items-center gap-4 text-sm text-dark-400">
               <span>Version 1.0.0</span>

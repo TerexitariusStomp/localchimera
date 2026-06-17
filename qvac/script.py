@@ -407,7 +407,7 @@ class Scene4_Runtime(Scene):
                 )
             else:
                 mob.become(
-                    Text("Night: Stellar sky AI + Mining", font_size=BODY, color=CYAN, font=MONO)
+                    Text("Night: AI Writer idle + Mining", font_size=BODY, color=CYAN, font=MONO)
                     .next_to(timeline, DOWN, buff=0.8)
                 )
 
@@ -584,7 +584,7 @@ class Scene6_DeployCTA(Scene):
         self.wait(0.5)
 
         cta = Text(
-            "github.com/TerexitariusStomp/qvac-pear-miner-node",
+            "github.com/TerexitariusStomp/qvac-chimera",
             font_size=BODY, color=GREEN, font=MONO
         )
         cta.to_edge(DOWN, buff=0.6)

@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: qvac-pear-miner-node
+  name: qvac-chimera
   labels:
     app: qvac-pear-miner
     component: inference
@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - name: miner-node
-        image: qvac-pear-miner:latest
+        image: qvac-chimera:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000

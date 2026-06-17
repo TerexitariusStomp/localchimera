@@ -5,7 +5,7 @@
 ```bash
 # Clone repository
 git clone <repository-url>
-cd qvac-pear-miner-node
+cd qvac-chimera
 
 # Install dependencies
 npm install
@@ -39,7 +39,7 @@ chmod +x installer.sh
 ./installer.sh
 
 # Start the node
-cd ~/qvac-pear-miner-node
+cd ~/qvac-chimera
 npm start
 ```
 
@@ -65,8 +65,8 @@ CMD ["npm", "start"]
 Build and run:
 
 ```bash
-docker build -t qvac-pear-miner-node .
-docker run -d -p 3000:3000 -v $(pwd)/data:/app/data qvac-pear-miner-node
+docker build -t qvac-chimera .
+docker run -d -p 3000:3000 -v $(pwd)/data:/app/data qvac-chimera
 ```
 
 ## Configuration
@@ -121,7 +121,7 @@ INFO [MinerManager] Now running: cortensor
 
 ```bash
 # View all logs
-journalctl -u qvac-pear-miner-node -f
+journalctl -u qvac-chimera -f
 
 # Or if running manually
 tail -f data/node.log
@@ -202,9 +202,9 @@ tar -xzf backup-YYYYMMDD.tar.gz
 npm stop
 
 # Remove installation directory
-rm -rf ~/qvac-pear-miner-node
+rm -rf ~/qvac-chimera
 
 # Remove systemd service (if configured)
-sudo systemctl disable qvac-pear-miner-node
-sudo rm /etc/systemd/system/qvac-pear-miner-node.service
+sudo systemctl disable qvac-chimera
+sudo rm /etc/systemd/system/qvac-chimera.service
 ```

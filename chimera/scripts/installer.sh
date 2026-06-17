@@ -33,7 +33,7 @@ echo "✓ npm $(npm -v) detected"
 echo ""
 
 # Create installation directory
-INSTALL_DIR="$HOME/qvac-pear-miner-node"
+INSTALL_DIR="$HOME/qvac-chimera"
 echo "Installing to: $INSTALL_DIR"
 
 if [ -d "$INSTALL_DIR" ]; then

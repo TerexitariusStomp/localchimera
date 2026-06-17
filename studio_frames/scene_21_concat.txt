@@ -1,0 +1,7 @@
+file '/home/user/CascadeProjects/qvac-chimera/studio_frames/scene_21_base.png'
+duration 1.67
+file '/home/user/CascadeProjects/qvac-chimera/studio_frames/scene_21_var0.png'
+duration 1.67
+file '/home/user/CascadeProjects/qvac-chimera/studio_frames/scene_21_var1.png'
+duration 1.67
+file '/home/user/CascadeProjects/qvac-chimera/studio_frames/scene_21_var1.png'

@@ -158,8 +158,8 @@ export class NodeManager {
     this.logger.info(`Mode changed to: ${newMode}`);
     
     if (newMode === 'night') {
-      // Night mode: Stellar app active, miners in monitoring mode
-      this.logger.info('Night mode: Stellar app active, miners monitoring');
+      // Night mode: AI Writer idle, miners in monitoring mode
+      this.logger.info('Night mode: AI Writer idle, miners monitoring');
     } else {
       // Day mode: Inference earning active
       this.logger.info('Day mode: Inference earning active');

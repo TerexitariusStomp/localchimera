@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: qvac-pear-miner-node
+    container_name: qvac-chimera
     ports:
       - "3000:3000"
     volumes:

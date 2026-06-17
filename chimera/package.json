@@ -25,7 +25,7 @@
   "license": "MIT",
   "dependencies": {
     "@hyperswarm/secret-stream": "^6.0.0",
-    "@qvac/sdk": "^0.13.2",
+    "@qvac/sdk": "^0.13.3",
     "hypercore": "^10.0.0",
     "hyperswarm": "^4.0.0",
     "pear-runtime": "^1.0.0",

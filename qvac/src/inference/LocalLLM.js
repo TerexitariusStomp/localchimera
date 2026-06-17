@@ -1,41 +1,87 @@
-import { Worker } from 'worker_threads';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 import { Logger } from '../core/Logger.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
 /**
- * LocalLLM — Pure QVAC-native local inference.
+ * LocalLLM — QVAC-native local inference via @qvac/sdk.
  *
- * Uses @qvac/sdk to load models and run inference locally.
- * Demo mode only if QVAC SDK is unavailable.
+ * Uses the official QVAC SDK streaming completion API.
+ * Falls back to demo content if the SDK is unavailable.
  */
 export class LocalLLM {
   constructor(config = {}) {
     this.config = {
-      model: config.model || 'smollm2-360m-inst',
+      model: config.model || 'llama-3.2-1b-instruct',
       qvacModelConst: config.qvacModelConst || null,
-      timeout: config.timeout || 360000,
+      timeout: config.timeout || 300000,
       ...config
     };
     this.logger = new Logger('LocalLLM');
     this.qvac = null;
-    this.modelId = null;       // Kept loaded between requests
-    this._loading = null;      // Promise guard to avoid double-load
+    this.modelId = null;
+    this._loading = null;
+    this._qvacTimedOut = false;
   }
 
   async initialize() {
-    this.logger.info('Initializing LocalLLM (QVAC-native)...');
+    this.logger.info('Initializing LocalLLM (QVAC)...');
     try {
       this.qvac = await import('@qvac/sdk');
-      this.logger.info(`QVAC SDK loaded: ${Object.keys(this.qvac).slice(0, 5).join(', ')}...`);
-      // Pre-load model now so first request is fast
-      await this._ensureModelLoaded();
+      this.logger.info('QVAC SDK loaded.');
     } catch (e) {
-      this.logger.warn(`QVAC SDK not available (${e.message}) — demo mode active`);
+      this.logger.warn(`QVAC SDK not available: ${e.message}`);
       this.qvac = null;
     }
+  }
+
+  async generate(prompt, options = {}) {
+    const title = options.title || prompt.split('.')[0].slice(0, 60);
+
+    if (this.qvac && !this._qvacTimedOut) {
+      try {
+        return await this._generateQVAC(prompt, title);
+      } catch (e) {
+        this.logger.warn(`QVAC generation failed: ${e.message}`);
+        this._qvacTimedOut = true;
+      }
+    }
+
+    return this._generateDemo(prompt, title);
+  }
+
+  async _generateQVAC(prompt, title) {
+    this.logger.info(`Generating via QVAC SDK: ${title}`);
+    const { completion } = this.qvac;
+    const modelId = await this._ensureModelLoaded();
+
+    const history = [
+      {
+        role: 'system',
+        content: (
+          'You are a wiki writer. Write high-quality markdown content. ' +
+          'Use headings, lists, bold/italic, code blocks, tables, and wiki links [[PageName]] where relevant. ' +
+          'Use #tags for categorization. Be concise but thorough. ' +
+          'Output ONLY the markdown body content — no explanations, no wrap-up sentences.'
+        )
+      },
+      { role: 'user', content: `Write a wiki page about: ${prompt}` }
+    ];
+
+    const result = completion({
+      modelId,
+      history,
+      stream: true,
+      generationParams: { predict: 50, temp: 0.7 }
+    });
+
+    let body = '';
+    for await (const token of result.tokenStream) {
+      body += token;
+    }
+
+    if (!body) {
+      throw new Error('QVAC SDK completion produced no output');
+    }
+
+    return { title, body: body.trim(), source: 'qvac', model: this.config.model };
   }
 
   async _ensureModelLoaded() {
@@ -43,12 +89,13 @@ export class LocalLLM {
     if (this._loading) return this._loading;
 
     this._loading = (async () => {
-      const { loadModel, SMOLLM2_360M_INST_Q8 } = this.qvac;
-      const modelSrc = this.config.qvacModelConst || SMOLLM2_360M_INST_Q8;
+      const { loadModel, LLAMA_3_2_1B_INST_Q4_0 } = this.qvac;
+      const modelSrc = this.config.qvacModelConst || LLAMA_3_2_1B_INST_Q4_0;
       this.logger.info(`Loading QVAC model (once)...`);
       this.modelId = await loadModel({
         modelSrc,
         modelType: 'llm',
+        modelConfig: { device: 'cpu' },
         onProgress: (p) => {
           if (p.percent % 10 === 0) this.logger.info(`Model load: ${p.percent}%`);
         },
@@ -63,67 +110,6 @@ export class LocalLLM {
       this._loading = null;
     }
     return this.modelId;
-  }
-
-  async generate(prompt, options = {}) {
-    const title = options.title || prompt.split('.')[0].slice(0, 60);
-    if (this.qvac) {
-      return this._generateQVAC(prompt, title);
-    }
-    return this._generateDemo(prompt, title);
-  }
-
-  async _generateQVAC(prompt, title) {
-    this.logger.info(`Generating via QVAC SDK: ${title}`);
-    const modelId = await this._ensureModelLoaded();
-    const maxTokens = this.config.maxTokens || 800;
-    const timeLimitMs = this.config.timeout || 360000;
-
-    const history = [
-      {
-        role: 'system',
-        content: 'Write concise markdown wiki content. Use ## headings, bullet lists, [[WikiLinks]], and #tags. Output markdown only, no preamble.'
-      },
-      { role: 'user', content: `Write a wiki page about: ${prompt}` }
-    ];
-
-    return new Promise((resolve, reject) => {
-      const worker = new Worker(join(__dirname, 'qvac-worker.js'), {
-        workerData: { history, maxTokens }
-      });
-
-      let lastBody = '';
-      const timer = setTimeout(() => {
-        worker.terminate();
-        if (lastBody) {
-          this.logger.warn(`Worker timed out — returning ${lastBody.length} chars`);
-          resolve({ title, body: lastBody.trim(), source: 'qvac', model: this.config.model });
-        } else {
-          reject(new Error(`QVAC worker timed out after ${timeLimitMs / 1000}s with no output`));
-        }
-      }, timeLimitMs);
-
-      worker.on('message', (msg) => {
-        if (msg.type === 'status') {
-          this.logger.info(`[worker] ${msg.message}`);
-        } else if (msg.type === 'token') {
-          lastBody = msg.body;
-        } else if (msg.type === 'done') {
-          clearTimeout(timer);
-          worker.terminate();
-          resolve({ title, body: msg.body.trim(), source: 'qvac', model: this.config.model });
-        } else if (msg.type === 'error') {
-          clearTimeout(timer);
-          worker.terminate();
-          reject(new Error(msg.message));
-        }
-      });
-
-      worker.on('error', (err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-    });
   }
 
   _generateDemo(prompt, title) {
@@ -149,7 +135,7 @@ export class LocalLLM {
 
   getStatus() {
     return {
-      qvacAvailable: !!this.qvac,
+      qvacAvailable: !!this.qvac && !this._qvacTimedOut,
       qvacExports: this.qvac ? Object.keys(this.qvac).slice(0, 5) : [],
       model: this.config.model,
     };

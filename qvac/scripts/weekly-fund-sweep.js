@@ -186,7 +186,8 @@ async function initiateCollectionSweep(network, amount, multisigManager, isDryRu
 function getNetworkToken(network) {
   const tokens = {
     nostr: 'sats',
-    bittensor: 'TAO'
+    bittensor: 'TAO',
+    solana: 'SOL'
   };
   return tokens[network] || 'tokens';
 }

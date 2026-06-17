@@ -9,7 +9,7 @@ echo "=== QVAC Production Startup ==="
 echo ""
 
 # Ensure log dirs exist
-mkdir -p /home/user/CascadeProjects/qvac-pear-miner-node/logs
+mkdir -p "$(dirname "$0")/logs"
 mkdir -p /home/user/otterwiki-repo/logs
 
 # Kill any stale processes on our ports
@@ -23,7 +23,7 @@ for PORT in 3000 8082; do
 done
 
 # Build frontend if dist is stale
-FRONTEND_DIR="/home/user/CascadeProjects/qvac-pear-miner-node/frontend"
+FRONTEND_DIR="$(dirname "$0")/frontend"
 if [ ! -d "$FRONTEND_DIR/dist" ] || [ "$FRONTEND_DIR/src" -nt "$FRONTEND_DIR/dist" ]; then
   echo "Building frontend..."
   cd "$FRONTEND_DIR" && npx vite build --silent
