@@ -154,6 +154,13 @@ Copy the topic hex and invite others to join.
         contentType = 'text/html';
       } else if (pathname.startsWith('/assets/')) {
         filePath = path.join(PUBLIC_DIR, pathname);
+        try {
+          await fs.access(filePath);
+        } catch {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end('Not found');
+          return;
+        }
         if (pathname.endsWith('.js')) contentType = 'application/javascript';
         else if (pathname.endsWith('.css')) contentType = 'text/css';
       } else {
@@ -168,7 +175,13 @@ Copy the topic hex and invite others to join.
           else if (pathname.endsWith('.png')) contentType = 'image/png';
           else if (pathname.endsWith('.svg')) contentType = 'image/svg+xml';
         } catch {
-          // SPA fallback: serve index.html for unknown routes
+          // Don't fallback for known asset extensions — return 404 so browser knows to refresh
+          if (/\.(js|css|png|svg|json|woff|woff2|ttf|eot)$/i.test(pathname)) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not found');
+            return;
+          }
+          // SPA fallback: serve index.html for unknown routes (no extension or .html)
           filePath = path.join(PUBLIC_DIR, 'index.html');
           contentType = 'text/html';
         }
