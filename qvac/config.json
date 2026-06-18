@@ -104,6 +104,7 @@
   "multisig": {
     "enabled": true,
     "machineOwnerAddress": "0xa2bCA2e01Fc1631e5577994404C4e3d742b284bf",
+    "appDeveloperAddress": "",
     "evmMultisigAddress": "0xa2bCA2e01Fc1631e5577994404C4e3d742b284bf",
     "revenueSplit": {
       "machineOwner": 0.70,

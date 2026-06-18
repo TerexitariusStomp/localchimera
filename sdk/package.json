@@ -1,0 +1,17 @@
+{
+  "name": "@chimera/sdk",
+  "version": "1.0.0",
+  "description": "Chimera SDK — integrate local AI mining into your app. Earn when your users' devices are idle.",
+  "main": "src/ChimeraSDK.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/**/*.test.js"
+  },
+  "keywords": ["chimera", "qvac", "mining", "inference", "ai", "p2p"],
+  "author": "Chimera",
+  "license": "MIT",
+  "dependencies": {},
+  "peerDependencies": {
+    "@qvac/sdk": ">=1.0.0"
+  }
+}
