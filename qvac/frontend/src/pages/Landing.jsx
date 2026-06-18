@@ -384,18 +384,18 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
                 </h3>
                 <div className="space-y-3">
                   {[
-                    { icon: Zap, name: 'Cortensor', desc: 'Decentralized AI network', color: 'purple' },
-                    { icon: Cpu, name: 'Chutes', desc: 'GPU compute validation', color: 'blue' },
-                    { icon: Activity, name: 'Fortytwo', desc: 'AI inference network', color: 'green' },
-                    { icon: Sparkles, name: 'Earnidle', desc: 'Idle compute protocol', color: 'orange' },
-                    { icon: Zap, name: 'Routstr', desc: 'Decentralized AI inference router', color: 'yellow' },
+                    { icon: Zap, name: 'Cortensor', desc: 'Decentralized AI network', color: 'purple', url: 'https://cortensor.network/' },
+                    { icon: Cpu, name: 'Chutes', desc: 'GPU compute validation', color: 'blue', url: 'https://chutes.ai/' },
+                    { icon: Activity, name: 'Fortytwo', desc: 'AI inference network', color: 'green', url: 'https://fortytwo.network/' },
+                    { icon: Sparkles, name: 'Earnidle', desc: 'Idle compute protocol', color: 'orange', url: 'https://earnidle.ai/' },
+                    { icon: Zap, name: 'Routstr', desc: 'Decentralized AI inference router', color: 'yellow', url: 'https://routstr.com/' },
                   ].map(m => (
                     <div key={m.name} className="flex items-center gap-3 p-3 rounded-lg group hover:bg-white/[0.04] transition-colors" style={{ background: 'rgba(255,255,255,0.03)' }}>
                       <div className={`w-8 h-8 rounded flex items-center justify-center ${m.color === 'purple' ? 'bg-purple-500/15' : m.color === 'blue' ? 'bg-blue-500/15' : m.color === 'green' ? 'bg-green-500/15' : m.color === 'orange' ? 'bg-orange-500/15' : 'bg-yellow-500/15'}`}>
                         <m.icon size={14} className={m.color === 'purple' ? 'text-purple-400' : m.color === 'blue' ? 'text-blue-400' : m.color === 'green' ? 'text-green-400' : m.color === 'orange' ? 'text-orange-400' : 'text-yellow-400'} />
                       </div>
                       <div className="flex-1">
-                        <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '15px' }} className="text-white/80">{m.name}</p>
+                        <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '15px' }} className="text-white/80 hover:text-cyan-300 transition-colors">{m.name}</a>
                         <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '14px' }} className="text-white/30">{m.desc}</p>
                       </div>
                     </div>
@@ -422,7 +422,7 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
               Download & run locally.
             </h2>
             <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '18px' }} className="text-white/40 max-w-xl mx-auto">
-              Enter your EVM payout address and download the installer for your platform. The LLM Wiki runs on localhost:3002 with node controls in the sidebar.
+              Enter your EVM payout address and download the installer for your platform. The example app runs on localhost with node controls in the sidebar.
             </p>
           </FadeUp>
           <AIWriterExample onNavigateBack={() => {}} onNavigateToDashboard={onNavigateToDashboard} />
