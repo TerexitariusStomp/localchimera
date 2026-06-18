@@ -140,55 +140,6 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
     return () => window.removeEventListener('scroll', fn)
   }, [])
 
-  const downloadFile = (content, filename, mimeType = 'text/plain') => {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const detectOS = () => {
-    const ua = navigator.userAgent;
-    if (/Android/i.test(ua)) return 'android';
-    if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
-    if (ua.indexOf('Win') !== -1) return 'windows';
-    if (ua.indexOf('Mac') !== -1) return 'mac';
-    return 'linux';
-  };
-
-  const handleDownload = () => {
-    const address = localStorage.getItem('chimeraEvmAddress') || '0x0000000000000000000000000000000000000000';
-    const os = detectOS();
-    const repo = 'https://github.com/TerexitariusStomp/qvac-chimera.git';
-    const folder = 'qvac-chimera';
-
-    if (os === 'android') {
-      const content = `#!/bin/bash\necho "========================================"\necho "  Chimera - Android Setup"\necho "========================================"\necho\necho "Install Termux from F-Droid or Play Store, then run:"\necho\necho "  pkg update"\necho "  pkg install git nodejs"\necho "  git clone ${repo}"\necho "  cd qvac-chimera/qvac"\necho "  npm install"\necho "  cd frontend && npm install && npm run build && cd .."\necho "  export MACHINE_OWNER_EVM=${address}"\necho "  node src/index.js"\necho\necho "Then open http://localhost:3002 in your browser."\necho "Start/stop mining inside the app sidebar."\n`;
-      downloadFile(content, 'install-chimera-android.sh', 'text/plain');
-      return;
-    }
-    if (os === 'ios') {
-      const content = `Chimera - iOS Setup\n================================\n\n1. Install a-Shell from the App Store (free terminal app).\n\n2. Inside a-Shell, run:\n\n   git clone ${repo}\n   cd qvac-chimera/qvac\n   npm install\n   cd frontend && npm install && npm run build && cd ..\n   export MACHINE_OWNER_EVM=${address}\n   node src/index.js\n\n3. Open Safari to http://localhost:3002\n\nStart/stop mining inside the app sidebar.\n`;
-      downloadFile(content, 'install-chimera-ios.txt', 'text/plain');
-      return;
-    }
-
-    let file, content;
-    if (os === 'windows') {
-      file = 'install-chimera.bat';
-      content = `@echo off\r\necho ======================================\r\necho   Chimera - Setup\r\necho ======================================\r\necho.\r\necho This script downloads and runs Chimera on your machine.\r\necho Start/stop mining is handled inside the app.\r\necho.\r\necho Checking Node.js...\r\nnode --version >nul 2>&1\r\nif errorlevel 1 (\r\n  echo Node.js not found. Please install from https://nodejs.org/\r\n  pause\r\n  exit /b 1\r\n)\r\necho.\r\necho Downloading Chimera...\r\nif not exist ${folder} (\r\n  git clone ${repo} || (echo Git not found ^& pause ^& exit /b 1)\r\n) else (\r\n  echo Already downloaded, updating...\r\n  cd ${folder}\r\n  git pull\r\n  cd ..\r\n)\r\ncd ${folder}\\qvac\r\necho Installing dependencies...\r\nnpm install\r\ncd frontend\r\nnpm install\r\nnpm run build\r\ncd ..\r\necho Setting EVM address...\r\nset MACHINE_OWNER_EVM=${address}\r\nset APP_ID=protocol-default\r\necho.\r\necho ======================================\r\necho   Ready! Opening http://localhost:3002\r\necho   Start/stop miner inside the app sidebar.\r\necho ======================================\r\nstart http://localhost:3002\r\nnode src/index.js\r\n`;
-    } else {
-      file = 'install-chimera.sh';
-      content = `#!/bin/bash\necho "========================================"\necho "  Chimera - Setup"\necho "========================================"\necho\necho "This script downloads and runs Chimera on your machine."\necho "Start/stop mining is handled inside the app."\necho\necho "Checking Node.js..."\nif ! command -v node &> /dev/null; then\n  echo "Node.js not found. Install from https://nodejs.org/"\n  exit 1\nfi\nnode --version\necho\necho "Downloading Chimera..."\nif [ ! -d "${folder}" ]; then\n  git clone ${repo} || { echo "Git not found"; exit 1; }\nelse\n  echo "Already downloaded, updating..."\n  cd ${folder}\n  git pull\n  cd ..\nfi\ncd ${folder}/qvac\necho "Installing dependencies..."\nnpm install\ncd frontend\nnpm install\nnpm run build\ncd ..\necho "Setting EVM address..."\nexport MACHINE_OWNER_EVM=${address}\nexport APP_ID=protocol-default\necho\necho "========================================"\necho "  Ready! Opening http://localhost:3002"\necho "  Start/stop miner inside the app sidebar."\necho "========================================"\nopen http://localhost:3002 2>/dev/null || xdg-open http://localhost:3002 2>/dev/null || echo "Open http://localhost:3002"\nnode src/index.js\n`;
-    }
-    downloadFile(content, file, 'text/plain');
-  };
-
   return (
     <div className="relative min-h-screen" style={{ background: '#04040a' }}>
       <GridOverlay />
@@ -271,14 +222,14 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
 
         <FadeUp delay={350}>
           <div className="flex items-center gap-4 flex-wrap justify-center mb-20">
-            <button
-              onClick={handleDownload}
+            <a
+              href="#install"
               className="group flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-300 text-black text-sm font-semibold hover:from-cyan-300 hover:to-cyan-200 transition-all shadow-[0_0_24px_#00e5ff28] hover:shadow-[0_0_36px_#00e5ff45]"
             >
               <Download size={14} />
               Download
               <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-            </button>
+            </a>
           </div>
         </FadeUp>
 
@@ -459,39 +410,49 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
         </div>
       </section>
 
-      {/* Get Started — AI Writer Example */}
-      <section className="relative py-32 px-6">
+      {/* Install */}
+      <section id="install" className="relative py-32 px-6">
         <Divider />
         <div className="max-w-6xl mx-auto">
           <FadeUp className="text-center mb-16">
             <Label color="amber">Get Started</Label>
             <h2 style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 700, fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 1.1 }} className="text-white mb-4">
-              Download & run locally.
+              Download for your platform.
             </h2>
             <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '18px' }} className="text-white/40 max-w-xl mx-auto">
-              Enter your EVM payout address and download the installer for your platform. The example app runs on localhost with node controls in the sidebar.
+              Install the desktop app. It bundles a supervisor that handles Docker automatically. No terminal required.
             </p>
           </FadeUp>
-          <AIWriterExample onNavigateBack={() => {}} onNavigateToDashboard={onNavigateToDashboard} />
-        </div>
-      </section>
 
-      {/* Example app */}
-      <section className="relative py-24 px-6">
-        <Divider />
-        <div className="max-w-3xl mx-auto text-center">
-          <FadeUp>
-            <Label color="cyan">Example app</Label>
-            <h2 style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 700, fontSize: 'clamp(24px, 3.5vw, 36px)', lineHeight: 1.1 }} className="text-white mb-4">
-              AI Writer
-            </h2>
-            <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '17px', lineHeight: 1.7 }} className="text-white/40 mb-6">
-              This demo shows how a local AI app can use QVAC for its own inference while also giving users the option to share idle capacity with outside task networks.
-            </p>
-            <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '15px' }} className="text-white/25">
-              In your own app, users get the same simple setup flow. Only an EVM address is required for payouts.
-            </p>
-          </FadeUp>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[
+              { name: 'Windows', ext: '.msi', icon: 'W', color: 'cyan', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest' },
+              { name: 'macOS', ext: '.dmg', icon: 'M', color: 'purple', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest' },
+              { name: 'Linux (.deb)', ext: '.deb', icon: 'L', color: 'green', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest/download/Chimera_1.0.0_amd64.deb' },
+              { name: 'Linux (.rpm)', ext: '.rpm', icon: 'L', color: 'green', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest/download/Chimera-1.0.0-1.x86_64.rpm' },
+              { name: 'Linux (AppImage)', ext: '.AppImage', icon: 'L', color: 'green', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest' },
+              { name: 'Android', ext: '.sh', icon: 'A', color: 'amber', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest' },
+              { name: 'iOS', ext: '.txt', icon: 'i', color: 'amber', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest' },
+            ].map((p, i) => (
+              <FadeUp key={p.name} delay={i * 80}>
+                <a
+                  href={p.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`rounded-xl border p-6 text-left transition-all duration-300 flex items-center gap-4 ${p.color === 'cyan' ? 'border-cyan-400/15 bg-cyan-400/4 hover:border-cyan-400/25' : p.color === 'purple' ? 'border-purple-400/15 bg-purple-400/4 hover:border-purple-400/25' : p.color === 'green' ? 'border-green-400/15 bg-green-400/4 hover:border-green-400/25' : 'border-amber-400/15 bg-amber-400/4 hover:border-amber-400/25'}`}
+                >
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${p.color === 'cyan' ? 'bg-cyan-400/10' : p.color === 'purple' ? 'bg-purple-400/10' : p.color === 'green' ? 'bg-green-400/10' : 'bg-amber-400/10'}`}>
+                    <span className={`text-sm font-bold ${p.color === 'cyan' ? 'text-cyan-400' : p.color === 'purple' ? 'text-purple-400' : p.color === 'green' ? 'text-green-400' : 'text-amber-400'}`}>{p.icon}</span>
+                  </div>
+                  <div>
+                    <h3 style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 600, fontSize: '15px' }} className="text-white mb-0.5">{p.name}</h3>
+                    <p style={{ fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace", fontSize: '12px' }} className="text-white/30">{p.ext}</p>
+                  </div>
+                  <span className="ml-auto text-white/20 text-sm">→</span>
+                </a>
+              </FadeUp>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -504,9 +465,9 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
           </FadeUp>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { num: '1', title: 'Enter your EVM payout address', desc: 'This is where your share of completed inference work is sent.' },
-              { num: '2', title: 'Download the installer', desc: 'The installer detects your operating system and sets up the node locally.' },
-              { num: '3', title: 'Run the node', desc: 'The app uses local AI when needed. When it is idle, spare inference capacity can be used by supported outside task networks.' },
+              { num: '1', title: 'Install the desktop app', desc: 'Download the native installer for your OS. It bundles a supervisor that handles Docker and container setup automatically.' },
+              { num: '2', title: 'Enter your EVM payout address', desc: 'Open the app, enter your EVM address once, and the supervisor configures everything. No terminal or manual Docker setup required.' },
+              { num: '3', title: 'Start the node', desc: 'Click Start in the app. The supervisor pulls the Chimera image, launches the container, and opens the local AI interface on localhost.' },
             ].map((step, i) => (
               <FadeUp key={step.num} delay={i * 100}>
                 <div className="rounded-xl border border-white/8 p-6 text-left h-full" style={{ background: 'rgba(10,10,20,0.75)', backdropFilter: 'blur(12px)' }}>
