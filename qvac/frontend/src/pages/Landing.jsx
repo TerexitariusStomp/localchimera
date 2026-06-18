@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import AIWriterExample from './AIWriterExample'
 import { MobileInstallPrompt } from '../components/MobileInstallPrompt'
+import { MobileSetup } from './MobileSetup'
 
 // ─── Visual design system ──────────────────────────────────────────────────
 function GridOverlay() {
@@ -432,8 +433,8 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
               { name: 'Linux (.deb)', ext: '.deb', icon: 'L', color: 'green', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest/download/Chimera_1.0.0_amd64.deb' },
               { name: 'Linux (.rpm)', ext: '.rpm', icon: 'L', color: 'green', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest/download/Chimera-1.0.0-1.x86_64.rpm' },
               { name: 'Linux (AppImage)', ext: '.AppImage', icon: 'L', color: 'green', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest' },
-              { name: 'Android (APK)', ext: '.apk', icon: 'A', color: 'amber', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest' },
-              { name: 'iOS (PWA)', ext: 'Add to Home Screen', icon: 'i', color: 'amber', url: '#install' },
+              { name: 'Android', ext: 'Termux + Node.js', icon: 'A', color: 'amber', url: '#mobile-setup' },
+              { name: 'iOS', ext: 'Remote monitor only', icon: 'i', color: 'amber', url: '#mobile-setup' },
             ].map((p, i) => (
               <FadeUp key={p.name} delay={i * 80}>
                 <a
@@ -454,13 +455,13 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
               </FadeUp>
             ))}
           </div>
-          <div className="max-w-md mx-auto mt-8 md:hidden">
-            <MobileInstallPrompt />
-          </div>
-          <div className="max-w-md mx-auto mt-8 hidden md:block">
-            <MobileInstallPrompt />
-          </div>
         </div>
+      </section>
+
+      {/* Mobile Setup */}
+      <section id="mobile-setup" className="relative py-24 px-6">
+        <Divider />
+        <MobileSetup />
       </section>
 
       {/* 3 Steps */}
