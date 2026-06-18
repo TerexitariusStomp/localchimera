@@ -12,7 +12,9 @@
     "@capacitor/android": "^8.4.0",
     "@capacitor/cli": "^8.4.0",
     "@capacitor/core": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
     "lucide-react": "^0.263.1",
+    "onnx-inference": "file:../../capacitor-plugins/onnx-inference",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.8.0"

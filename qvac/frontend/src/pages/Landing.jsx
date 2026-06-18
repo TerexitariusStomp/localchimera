@@ -434,7 +434,7 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
               { name: 'Linux (.rpm)', ext: '.rpm', icon: 'L', color: 'green', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest/download/Chimera-1.0.0-1.x86_64.rpm' },
               { name: 'Linux (AppImage)', ext: '.AppImage', icon: 'L', color: 'green', url: 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest' },
               { name: 'Android', ext: 'Termux + Node.js', icon: 'A', color: 'amber', url: '#mobile-setup' },
-              { name: 'iOS', ext: 'Remote monitor only', icon: 'i', color: 'amber', url: '#mobile-setup' },
+              { name: 'iOS', ext: 'Core ML inference', icon: 'i', color: 'amber', url: '#mobile-setup' },
             ].map((p, i) => (
               <FadeUp key={p.name} delay={i * 80}>
                 <a
