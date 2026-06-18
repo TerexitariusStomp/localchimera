@@ -69,6 +69,11 @@
     .platform .arrow{margin-left:auto;color:#7a7468;font-size:18px}
     .platform:hover .arrow{color:#e8e2d8}
     .platform.disabled{opacity:.5;pointer-events:none}
+    .auto-detect-wrap{text-align:center;margin-top:32px}
+    .auto-detect-btn{display:inline-flex;align-items:center;gap:10px;padding:14px 32px;border-radius:12px;background:linear-gradient(135deg,#00e5ff,#a855f7);color:#000;font-size:15px;font-weight:700;transition:.2s;cursor:pointer;border:none}
+    .auto-detect-btn:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,229,255,.25)}
+    .auto-detect-btn .os-icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+    .auto-detect-note{margin-top:10px;font-size:12px;color:#7a7468}
 
     .how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:40px}
     .how-step{text-align:center;padding:24px}
@@ -167,9 +172,9 @@
 <section class="section" id="apps" style="background:rgba(255,255,255,.01);border-top:1px solid rgba(255,255,255,.06)">
   <div class="container">
     <div class="section-header">
-      <div class="section-label">Apps</div>
-      <h2>Built on Chimera.</h2>
-      <p>The first apps running on the QVAC SDK.</p>
+      <div class="section-label">SDK</div>
+      <h2>Chimera SDK.</h2>
+      <p>Build on the QVAC SDK. Ship an app that runs local inference and mines tasks.</p>
     </div>
     <div class="cards" style="grid-template-columns:1fr 1fr">
       <div class="card" style="border-color:rgba(0,229,255,.2)">
@@ -243,6 +248,13 @@
         </div>
       </div>
     </div>
+    <div class="auto-detect-wrap">
+      <button class="auto-detect-btn" id="autoDownload" onclick="autoDownload()">
+        <span class="os-icon" id="osIcon">↓</span>
+        <span id="osLabel">Detecting your OS...</span>
+      </button>
+      <div class="auto-detect-note" id="osNote"></div>
+    </div>
   </div>
 </section>
 
@@ -308,6 +320,36 @@
     <p style="margin-top:8px"><a href="https://github.com/TerexitariusStomp/qvac-chimera" target="_blank" rel="noopener">GitHub</a> · <a href="https://x.com/LocalChimera" target="_blank" rel="noopener">Twitter</a></p>
   </div>
 </footer>
+
+<script>
+  (function() {
+    const ua = navigator.userAgent;
+    const platform = navigator.platform;
+    let os = 'unknown', icon = '↓', label = 'Download for your OS', url = 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest';
+
+    if (/Win/.test(platform) || /Windows/.test(ua)) {
+      os = 'windows'; icon = 'W'; label = 'Download for Windows';
+    } else if (/Mac/.test(platform) || /Macintosh/.test(ua)) {
+      os = 'macos'; icon = 'M'; label = 'Download for macOS';
+    } else if (/Linux/.test(platform) || /Linux/.test(ua) || /X11/.test(ua)) {
+      os = 'linux'; icon = 'L'; label = 'Download for Linux';
+    }
+
+    document.getElementById('osIcon').textContent = icon;
+    document.getElementById('osLabel').textContent = label;
+    if (os !== 'unknown') {
+      document.getElementById('osNote').textContent = 'Detected ' + os + '. Redirects to latest release.';
+    } else {
+      document.getElementById('osNote').textContent = 'Could not detect OS. Click to see all releases.';
+    }
+    window._chimeraOS = os;
+    window._chimeraURL = url;
+  })();
+
+  function autoDownload() {
+    window.open(window._chimeraURL || 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest', '_blank');
+  }
+</script>
 
 </body>
 </html>
