@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Zap, Cpu, Network, Database, Code2, Coins, Layers,
-  ChevronRight, ArrowRight, MessageCircle, Github,
+  ChevronRight, ArrowRight, Github,
   Terminal, Globe, Shield, Activity, Server,
   PlugZap, Sparkles, Wallet, ServerCrash, BookOpen
 } from 'lucide-react'
@@ -78,7 +78,7 @@ function Label({ children, color = 'cyan' }) {
   return (
     <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border mb-5 ${styles[color]}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${dot[color]}`} />
-      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '15px', letterSpacing: '0.1em' }} className="uppercase">
+      <span style={{ fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace", fontSize: '15px', letterSpacing: '0.1em' }} className="uppercase">
         {children}
       </span>
     </div>
@@ -160,7 +160,7 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center shadow-[0_0_16px_#00e5ff40]">
                 <Cpu size={13} className="text-black" strokeWidth={2.5} />
               </div>
-              <span style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 700, fontSize: '17px', letterSpacing: '0.04em' }} className="text-white">
+              <span style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 700, fontSize: '17px', letterSpacing: '0.04em' }} className="text-white">
                 Chimera
               </span>
             </div>
@@ -181,11 +181,13 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
                 GitHub
               </a>
               <a
-                href="#"
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 hover:border-purple-400/60 transition-all text-sm"
+                href="https://x.com/LocalChimera"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:border-white/20 hover:text-white/80 transition-all text-sm"
               >
-                <MessageCircle size={13} />
-                Discord
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                Twitter
               </a>
             </div>
           </nav>
@@ -196,24 +198,24 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
         <FadeUp delay={50}>
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/8 bg-white/3 mb-8 text-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_6px_#4ade80] animate-pulse" />
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '15px' }} className="text-white/50">Open source · Permissionless</span>
+            <span style={{ fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace", fontSize: '15px' }} className="text-white/50">Open source · Permissionless</span>
           </div>
         </FadeUp>
 
         <FadeUp delay={150}>
           <h1
-            style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 800, fontSize: 'clamp(44px, 8vw, 88px)', lineHeight: 1.02, letterSpacing: '-0.025em', color: '#fff' }}
+            style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 800, fontSize: 'clamp(44px, 8vw, 88px)', lineHeight: 1.02, letterSpacing: '-0.025em', color: '#fff' }}
             className="bg-gradient-to-br from-white via-white to-white/35 bg-clip-text text-transparent mb-6 max-w-4xl"
           >
             Decentralized LLM,<br />
-            <span style={{ fontFamily: "'Oxanium', sans-serif", color: '#fff' }} className="bg-gradient-to-r from-cyan-400 via-cyan-300 to-purple-400 bg-clip-text text-transparent">
+            <span style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", color: '#fff' }} className="bg-gradient-to-r from-cyan-400 via-cyan-300 to-purple-400 bg-clip-text text-transparent">
               woven into your app.
             </span>
           </h1>
         </FadeUp>
 
         <FadeUp delay={250}>
-          <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 'clamp(17px, 2.2vw, 21px)', lineHeight: 1.75 }} className="text-white/70 max-w-2xl mb-10">
+          <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: 'clamp(17px, 2.2vw, 21px)', lineHeight: 1.75 }} className="text-white/70 max-w-2xl mb-10">
             A distributed AI wiki and miner node. The LLMwiki is powered by the same QVAC inference backend that serves task networks like Cortensor, Chutes, and Routstr. All inference runs through one unified QVAC instance.
           </p>
         </FadeUp>
@@ -260,11 +262,11 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
               >
                 <div className="flex items-center gap-2 mb-3">
                   <c.icon size={14} className={c.color === 'cyan' ? 'text-cyan-400' : 'text-purple-400'} />
-                  <span style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 600, fontSize: '15px' }} className="text-white/80">
+                  <span style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 600, fontSize: '15px' }} className="text-white/80">
                     {c.who}
                   </span>
                 </div>
-                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '15px', lineHeight: 1.65 }} className="text-white/40">
+                <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '15px', lineHeight: 1.65 }} className="text-white/40">
                   {c.line}
                 </p>
               </div>
@@ -282,16 +284,16 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
             <GlassCard hoverColor="purple">
               <div className="flex items-center gap-3 mb-3">
                 <Cpu size={20} className="text-purple-400" />
-                <h2 style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 700, fontSize: '18px' }} className="text-white">
+                <h2 style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 700, fontSize: '18px' }} className="text-white">
                   {mobileOS === 'android' ? 'Download Chimera Miner for Android' : 'Get Chimera Miner for iPhone'}
                 </h2>
               </div>
-              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '15px' }} className="text-white/40 mb-4">
+              <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '15px' }} className="text-white/40 mb-4">
                 {mobileOS === 'android'
                   ? 'Install via Termux script. The wiki runs natively and auto-configures miners.'
                   : 'Install via a-Shell. The iOS build connects directly to the mining network via Pear P2P.'}
               </p>
-              <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '15px' }} className="text-white/25">
+              <p style={{ fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace", fontSize: '15px' }} className="text-white/25">
                 Use the emulator below to get your setup script.
               </p>
             </GlassCard>
@@ -305,7 +307,7 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
         <div className="max-w-6xl mx-auto">
           <FadeUp className="text-center mb-16">
             <Label color="purple">Key Features</Label>
-            <h2 style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 700, fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 1.1 }} className="text-white mb-4">
+            <h2 style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 700, fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 1.1 }} className="text-white mb-4">
               One node.<br />
               <span className="bg-gradient-to-r from-purple-400 to-purple-200 bg-clip-text text-transparent">Many networks.</span>
             </h2>
@@ -325,8 +327,8 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${f.accent === 'cyan' ? 'bg-cyan-400/10' : f.accent === 'purple' ? 'bg-purple-400/10' : 'bg-amber-400/10'}`}>
                     <f.icon size={20} strokeWidth={1.7} className={f.accent === 'cyan' ? 'text-cyan-400' : f.accent === 'purple' ? 'text-purple-400' : 'text-amber-400'} />
                   </div>
-                  <h3 style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 600, fontSize: '17px' }} className="text-white mb-2">{f.title}</h3>
-                  <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '15px', lineHeight: 1.65 }} className="text-white/40 mb-3">{f.desc}</p>
+                  <h3 style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 600, fontSize: '17px' }} className="text-white mb-2">{f.title}</h3>
+                  <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '15px', lineHeight: 1.65 }} className="text-white/40 mb-3">{f.desc}</p>
                   {f.link && (
                     <a href={f.link} target="_blank" rel="noopener noreferrer" className="text-sm text-cyan-400/70 hover:text-cyan-300 transition-colors">
                       {f.link.replace(/^https?:\/\//, '').replace(/\/$/, '')} →
@@ -346,7 +348,7 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
         <div className="max-w-6xl mx-auto relative">
           <FadeUp className="text-center mb-16">
             <Label color="cyan">Architecture</Label>
-            <h2 style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 700, fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 1.1 }} className="text-white">
+            <h2 style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 700, fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 1.1 }} className="text-white">
               Core components &<br />
               <span className="bg-gradient-to-r from-cyan-400 to-cyan-200 bg-clip-text text-transparent">parallel miners.</span>
             </h2>
@@ -355,7 +357,7 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <FadeUp delay={100}>
               <GlassCard className="h-full">
-                <h3 style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 600, fontSize: '16px' }} className="text-white mb-5 flex items-center gap-2">
+                <h3 style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 600, fontSize: '16px' }} className="text-white mb-5 flex items-center gap-2">
                   <Server size={16} className="text-cyan-400" />
                   Core Components
                 </h3>
@@ -370,8 +372,8 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
                     <div key={c.title} className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)' }}>
                       <c.icon size={14} className={c.accent === 'cyan' ? 'text-cyan-400' : c.accent === 'green' ? 'text-green-400' : c.accent === 'blue' ? 'text-blue-400' : c.accent === 'orange' ? 'text-orange-400' : 'text-purple-400'} />
                       <div className="flex-1">
-                        <p style={{ fontFamily: "'Oxanium', sans-serif", fontSize: '15px' }} className="text-white/80">{c.title}</p>
-                        <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '14px' }} className="text-white/30">{c.desc}</p>
+                        <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '15px' }} className="text-white/80">{c.title}</p>
+                        <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '14px' }} className="text-white/30">{c.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -381,7 +383,7 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
 
             <FadeUp delay={200}>
               <GlassCard className="h-full">
-                <h3 style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 600, fontSize: '16px' }} className="text-white mb-5 flex items-center gap-2">
+                <h3 style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 600, fontSize: '16px' }} className="text-white mb-5 flex items-center gap-2">
                   <Cpu size={16} className="text-purple-400" />
                   Parallel Miners
                 </h3>
@@ -398,14 +400,14 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
                         <m.icon size={14} className={m.color === 'purple' ? 'text-purple-400' : m.color === 'blue' ? 'text-blue-400' : m.color === 'green' ? 'text-green-400' : m.color === 'orange' ? 'text-orange-400' : 'text-yellow-400'} />
                       </div>
                       <div className="flex-1">
-                        <p style={{ fontFamily: "'Oxanium', sans-serif", fontSize: '15px' }} className="text-white/80">{m.name}</p>
-                        <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '14px' }} className="text-white/30">{m.desc}</p>
+                        <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '15px' }} className="text-white/80">{m.name}</p>
+                        <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '14px' }} className="text-white/30">{m.desc}</p>
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="mt-4 p-4 rounded-xl border border-cyan-400/15 bg-cyan-400/5">
-                  <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '15px' }} className="text-cyan-300/70">
+                  <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '15px' }} className="text-cyan-300/70">
                     <span className="text-cyan-400 font-medium">Parallel Mode:</span> All miners run simultaneously in monitoring mode, detecting inference tasks in real-time.
                   </p>
                 </div>
@@ -421,10 +423,10 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
         <div className="max-w-6xl mx-auto">
           <FadeUp className="text-center mb-16">
             <Label color="amber">Get Started</Label>
-            <h2 style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 700, fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 1.1 }} className="text-white mb-4">
+            <h2 style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 700, fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 1.1 }} className="text-white mb-4">
               Download & run locally.
             </h2>
-            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '18px' }} className="text-white/40 max-w-xl mx-auto">
+            <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '18px' }} className="text-white/40 max-w-xl mx-auto">
               Enter your EVM address and download the setup script for your platform. The LLM Wiki runs on localhost:3002 with miner controls in the sidebar.
             </p>
           </FadeUp>
@@ -438,7 +440,7 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
         <div className="max-w-6xl mx-auto">
           <FadeUp className="text-center mb-16">
             <Label>Technology Stack</Label>
-            <h2 style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 700, fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 1.1 }} className="text-white">
+            <h2 style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 700, fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 1.1 }} className="text-white">
               Built on proven tech.
             </h2>
           </FadeUp>
@@ -455,8 +457,8 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
                   <div className={`w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-3 ${t.accent === 'cyan' ? 'bg-cyan-400/10' : t.accent === 'purple' ? 'bg-purple-400/10' : t.accent === 'green' ? 'bg-green-400/10' : 'bg-amber-400/10'}`}>
                     <t.icon size={20} strokeWidth={1.5} className={t.accent === 'cyan' ? 'text-cyan-400' : t.accent === 'purple' ? 'text-purple-400' : t.accent === 'green' ? 'text-green-400' : 'text-amber-400'} />
                   </div>
-                  <div style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 700, fontSize: '16px' }} className="text-white mb-1">{t.name}</div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px' }} className="text-white/30 uppercase tracking-wider">{t.role}</div>
+                  <div style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 700, fontSize: '16px' }} className="text-white mb-1">{t.name}</div>
+                  <div style={{ fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace", fontSize: '12px' }} className="text-white/30 uppercase tracking-wider">{t.role}</div>
                 </div>
               </FadeUp>
             ))}
@@ -471,9 +473,9 @@ export default function Landing({ onNavigateToDashboard, onNavigateToMiner, onNa
             <div className="w-5 h-5 rounded bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center shadow-[0_0_10px_#00e5ff30]">
               <Cpu size={10} className="text-black" strokeWidth={2.5} />
             </div>
-            <span style={{ fontFamily: "'Oxanium', sans-serif", fontWeight: 700, fontSize: '15px' }} className="text-white/50">Chimera</span>
+            <span style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontWeight: 700, fontSize: '15px' }} className="text-white/50">Chimera</span>
           </div>
-          <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '14px' }} className="text-white/22">
+          <p style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", fontSize: '14px' }} className="text-white/22">
             Decentralised LLM infrastructure · Open source · Permissionless
           </p>
           <div className="flex gap-4">

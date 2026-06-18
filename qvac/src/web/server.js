@@ -9,6 +9,7 @@ import { NodeOrchestrator } from '../orchestrator/NodeOrchestrator.js';
 import { matchRoute } from './router.js';
 import { ok, accepted, badRequest, serverError, serviceUnavailable, parseBody } from './reply.js';
 import { extractBoundary, readBody, parseMultipart } from './multipart.js';
+import { repoToMarkdown } from './repoDigest.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -399,6 +400,13 @@ print(result.text_content)
     const removed = await this.indexer.removeDocument(id);
     if (removed) ok(res, { deleted: true });
     else badRequest(res, 'Document not found');
+  }
+
+  async handleRepoToMd(req, res) {
+    const body = await parseBody(req);
+    const result = await repoToMarkdown(body);
+    if (result.success) ok(res, result.data);
+    else badRequest(res, result.error);
   }
 
   async handleLLMWikiSave(req, res) {

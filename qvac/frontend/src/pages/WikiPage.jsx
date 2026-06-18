@@ -140,6 +140,9 @@ export default function WikiPage({ onBack }) {
   const [dropHover, setDropHover] = useState(false);
   const [dropFiles, setDropFiles] = useState([]);
 
+  // Repo digest (ai-digest)
+  const [repoDigestPath, setRepoDigestPath] = useState('');
+
   // Integration status
   const [sysStatus, setSysStatus] = useState(null);
 
@@ -623,7 +626,7 @@ export default function WikiPage({ onBack }) {
           )}
         </nav>
         <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 10, color: '#4a4540', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'JetBrains Mono', monospace" }}>Hyperswarm</div>
+          <div style={{ fontSize: 10, color: '#4a4540', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" }}>Hyperswarm</div>
 
           {/* Scope selector */}
           <div style={{ display: 'flex', gap: 2, background: '#161410', borderRadius: 5, padding: 2, border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -684,7 +687,7 @@ export default function WikiPage({ onBack }) {
           )}
         </div>
         <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 10, color: '#4a4540', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'JetBrains Mono', monospace" }}>Miner Node</div>
+          <div style={{ fontSize: 10, color: '#4a4540', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" }}>Miner Node</div>
           <div style={{ fontSize: 10, color: nodeRunning ? '#86efac' : '#7a7468', lineHeight: 1.5 }}>
             {nodeRunning ? '🟢 Running — earning on inference tasks' : '⚪ Stopped — start to earn'}
           </div>
@@ -836,7 +839,7 @@ export default function WikiPage({ onBack }) {
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     flexShrink: 0,
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace",
                     ...(tab === 'auto'
                       ? { background: aiTab === tab ? '#dc2626' : '#450a0a', color: aiTab === tab ? '#fff' : '#fca5a5', border: '1px solid #b91c1c' }
                       : aiTab === tab
@@ -1006,6 +1009,52 @@ export default function WikiPage({ onBack }) {
                     ))}
                   </div>
                 )}
+
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 8, paddingTop: 8 }}>
+                  <div style={s.aiField}>
+                    <label style={s.aiLabel}>Repo to Markdown</label>
+                    <input
+                      style={s.aiInput}
+                      value={repoDigestPath}
+                      onChange={e => setRepoDigestPath(e.target.value)}
+                      placeholder="/path/to/repo or https://github.com/user/repo"
+                    />
+                  </div>
+                  <button
+                    style={s.aiBtn}
+                    onClick={async () => {
+                      if (!repoDigestPath.trim()) return;
+                      setSaveStatus('Digesting repo...');
+                      try {
+                        const isUrl = repoDigestPath.startsWith('http');
+                        const res = await fetch(`${API_BASE}/repo-to-md`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(isUrl ? { url: repoDigestPath } : { path: repoDigestPath })
+                        });
+                        const json = await res.json();
+                        if (json.success) {
+                          const md = json.data.markdown || '';
+                          setEditorText(prev => {
+                            const sep = prev.trim().length > 0 ? '\n\n---\n\n' : '';
+                            return prev + sep + md;
+                          });
+                          setSaveStatus(`Digested ${json.data.fileCount} files`);
+                          setRepoDigestPath('');
+                        } else {
+                          setSaveStatus(json.error || 'Digest failed');
+                        }
+                      } catch (err) {
+                        setSaveStatus('Digest failed');
+                      }
+                      setTimeout(() => setSaveStatus(''), 5000);
+                    }}
+                    disabled={!repoDigestPath.trim() || aiLoading}
+                  >
+                    📦 Digest Repo
+                  </button>
+                  <div style={s.aiHint}>Walks a directory and wraps each file in &lt;file&gt; tags. Ignores node_modules, .git, binaries.</div>
+                </div>
               </>
             )}
 
@@ -1033,7 +1082,7 @@ export default function WikiPage({ onBack }) {
         )}
         {aiOpen && (
           <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontSize: 10, color: '#4a4540', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'JetBrains Mono', monospace" }}>Openviking Memory</div>
+            <div style={{ fontSize: 10, color: '#4a4540', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" }}>Openviking Memory</div>
             <div style={{ fontSize: 10, color: '#86efac', lineHeight: 1.5 }}>AI memory store via REST API</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <button style={{ ...s.toolbarBtn, fontSize: 9, padding: '3px 6px', textAlign: 'left' }} onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/llmwiki-docs`)}>📋 Copy docs endpoint</button>
@@ -1057,7 +1106,7 @@ export default function WikiPage({ onBack }) {
 
 /* ─── Styles ─── */
 const s = {
-  layout: { display: 'flex', height: '100vh', background: '#0e0d0b', color: '#b0a898', fontFamily: "'Inter', system-ui, -apple-system, sans-serif", overflow: 'hidden' },
+  layout: { display: 'flex', height: '100vh', background: '#0e0d0b', color: '#b0a898', fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", overflow: 'hidden' },
 
   sidebar: { width: 240, minWidth: 240, background: '#0b0a09', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   sidebarHeader: { padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center' },
@@ -1065,9 +1114,9 @@ const s = {
   backBtn: { margin: '8px 12px 0', padding: '6px 10px', background: '#161410', color: '#7a7468', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 5, fontSize: 12, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' },
   searchBox: { padding: '10px 12px' },
   searchInput: { width: '100%', background: '#161410', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6, padding: '7px 11px', color: '#b0a898', fontSize: 13, outline: 'none' },
-  navHeader: { padding: '8px 14px 4px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4a4540', fontFamily: "'JetBrains Mono', monospace" },
+  navHeader: { padding: '8px 14px 4px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#4a4540', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" },
   nav: { flex: 1, overflowY: 'auto', padding: '0 8px 8px' },
-  navCategory: { padding: '8px 6px 2px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#4a4540', borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: 4, fontFamily: "'JetBrains Mono', monospace" },
+  navCategory: { padding: '8px 6px 2px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#4a4540', borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: 4, fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" },
   navItem: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 9px', borderRadius: 5, cursor: 'pointer', fontSize: 13, color: '#7a7468', transition: 'all 0.15s' },
   navItemActive: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 9px', borderRadius: 5, cursor: 'pointer', fontSize: 13, color: '#c9a96e', background: '#161410' },
   navIcon: { fontSize: 12, opacity: 0.6 },
@@ -1080,20 +1129,20 @@ const s = {
 
   toolbar: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: '#0b0a09', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 },
   toolbarGroup: { display: 'flex', alignItems: 'center', gap: 4 },
-  toolbarBtn: { padding: '5px 11px', background: '#161410', color: '#7a7468', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 5, fontSize: 11, cursor: 'pointer', transition: 'all 0.15s', fontFamily: "'JetBrains Mono', monospace" },
-  modeBtn: { padding: '5px 12px', background: 'transparent', color: '#4a4540', border: '1px solid transparent', borderRadius: 5, fontSize: 12, cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace", transition: 'all 0.15s' },
-  modeBtnActive: { padding: '5px 12px', background: '#161410', color: '#b0a898', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 5, fontSize: 12, cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace" },
+  toolbarBtn: { padding: '5px 11px', background: '#161410', color: '#7a7468', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 5, fontSize: 11, cursor: 'pointer', transition: 'all 0.15s', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" },
+  modeBtn: { padding: '5px 12px', background: 'transparent', color: '#4a4540', border: '1px solid transparent', borderRadius: 5, fontSize: 12, cursor: 'pointer', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace", transition: 'all 0.15s' },
+  modeBtnActive: { padding: '5px 12px', background: '#161410', color: '#b0a898', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 5, fontSize: 12, cursor: 'pointer', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" },
 
   editorPane: { flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' },
   full: { flex: 1, overflow: 'auto' },
   splitLeft: { width: '50%', overflow: 'auto', borderRight: '1px solid rgba(255,255,255,0.06)' },
   splitRight: { flex: 1, overflow: 'auto', display: 'flex' },
 
-  textarea: { width: '100%', height: '100%', background: '#161410', border: 'none', padding: '18px 22px', color: '#b0a898', fontSize: 14, lineHeight: 1.7, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace", resize: 'none', outline: 'none' },
+  textarea: { width: '100%', height: '100%', background: '#161410', border: 'none', padding: '18px 22px', color: '#b0a898', fontSize: 14, lineHeight: 1.7, fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace", resize: 'none', outline: 'none' },
   preview: { flex: 1, padding: '18px 26px', fontSize: 14, lineHeight: 1.7, overflow: 'auto', color: '#b0a898' },
 
   toc: { width: 200, minWidth: 200, padding: '16px 14px', borderLeft: '1px solid rgba(255,255,255,0.06)', background: '#0b0a09', fontSize: 12 },
-  tocTitle: { fontWeight: 700, color: '#7a7468', marginBottom: 8, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'JetBrains Mono', monospace" },
+  tocTitle: { fontWeight: 700, color: '#7a7468', marginBottom: 8, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" },
   tocItem: { padding: '3px 0', color: '#7a7468', cursor: 'pointer' },
   tocItem3: { padding: '3px 0 3px 12px', color: '#4a4540', cursor: 'pointer' },
 
@@ -1103,16 +1152,16 @@ const s = {
   aiToggle: { fontSize: 16, color: '#4a4540' },
   aiBody: { flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 },
   aiField: { display: 'flex', flexDirection: 'column', gap: 5 },
-  aiLabel: { fontSize: 10, color: '#4a4540', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" },
-  aiTextarea: { background: '#161410', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6, padding: '8px 10px', color: '#b0a898', fontSize: 13, resize: 'vertical', outline: 'none', fontFamily: "'Inter', sans-serif" },
+  aiLabel: { fontSize: 10, color: '#4a4540', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" },
+  aiTextarea: { background: '#161410', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6, padding: '8px 10px', color: '#b0a898', fontSize: 13, resize: 'vertical', outline: 'none', fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif" },
   aiInput: { background: '#161410', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6, padding: '7px 10px', color: '#b0a898', fontSize: 13, outline: 'none' },
-  aiBtn: { background: '#c9a96e', color: '#0e0d0b', border: 'none', padding: '8px 14px', borderRadius: 5, fontSize: 12, cursor: 'pointer', marginTop: 4, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", transition: 'all 0.15s' },
+  aiBtn: { background: '#c9a96e', color: '#0e0d0b', border: 'none', padding: '8px 14px', borderRadius: 5, fontSize: 12, cursor: 'pointer', marginTop: 4, fontWeight: 600, fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace", transition: 'all 0.15s' },
   aiHint: { fontSize: 11, color: '#4a4540', lineHeight: 1.5, marginTop: 4 },
 
-  tabBtn: { padding: '4px 8px', background: '#161410', color: '#7a7468', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace" },
+  tabBtn: { padding: '4px 8px', background: '#161410', color: '#7a7468', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" },
   tabBtnActive: { background: '#0e0d0b', color: '#c9a96e', border: '1px solid rgba(255,255,255,0.1)' },
 
-  miniBtn: { padding: '5px 8px', background: '#161410', color: '#7a7468', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, fontSize: 11, cursor: 'pointer', textAlign: 'left', fontFamily: "'JetBrains Mono', monospace" },
+  miniBtn: { padding: '5px 8px', background: '#161410', color: '#7a7468', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 4, fontSize: 11, cursor: 'pointer', textAlign: 'left', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" },
 
-  inlineBtn: { padding: '4px 8px', background: '#1e1c18', color: '#b0a898', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace" },
+  inlineBtn: { padding: '4px 8px', background: '#1e1c18', color: '#b0a898', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" },
 };

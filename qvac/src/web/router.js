@@ -17,6 +17,7 @@ export const ROUTES = [
   ['POST', '/api/llmwiki-create',     'handleLLMWikiCreate'],
   ['POST', '/api/llmwiki-upload',     'handleLLMWikiUpload'],
   ['POST', '/api/convert-to-md',      'handleConvertToMd'],
+  ['POST', '/api/repo-to-md',          'handleRepoToMd'],
   ['POST', '/api/llmwiki-save',       'handleLLMWikiSave'],
   ['GET',  '/api/llmwiki-docs',       'handleLLMWikiDocs'],
   ['GET',  '/api/llmwiki-search',     'handleLLMWikiSearch'],
