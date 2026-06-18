@@ -132,6 +132,40 @@ export default function WikiPage({ onBack }) {
 
   // Autoresearch
   const [autoTopic, setAutoTopic] = useState('');
+
+  // Auto-save: debounced save on editorText change
+  const saveTimeoutRef = useRef(null);
+  const lastSavedRef = useRef('');
+  useEffect(() => {
+    if (!editorText.trim() || editorText === lastSavedRef.current) return;
+    clearTimeout(saveTimeoutRef.current);
+    setSaveStatus('Unsaved changes...');
+    saveTimeoutRef.current = setTimeout(async () => {
+      const title = saveTitle.trim() || (editorText.match(/^#\s+(.+)$/m)?.[1] || 'Untitled');
+      setSaveStatus('Saving...');
+      try {
+        const res = await fetch(`${API_BASE}/llmwiki-save`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: editorText, title, category: saveCategory })
+        });
+        const json = await res.json();
+        if (json.success) {
+          lastSavedRef.current = editorText;
+          setSaveStatus('Saved');
+          setSaveTitle('');
+          await fetchDocs();
+          setTimeout(() => setSaveStatus(''), 2000);
+        } else {
+          setSaveStatus('Save failed');
+        }
+      } catch (e) {
+        console.error(e);
+        setSaveStatus('Save failed');
+      }
+    }, 2000);
+    return () => clearTimeout(saveTimeoutRef.current);
+  }, [editorText, saveTitle, saveCategory]);
   const [autoRunning, setAutoRunning] = useState(false);
   const [autoIntervalRef, setAutoIntervalRef] = useState(null);
   const [autoStatus, setAutoStatus] = useState('');
@@ -758,13 +792,10 @@ export default function WikiPage({ onBack }) {
             <button style={view === 'preview' ? s.modeBtnActive : s.modeBtn} onClick={() => setView('preview')}>Preview</button>
           </div>
           <div style={s.toolbarGroup}>
-            <button style={{ ...s.toolbarBtn, background: '#166534', color: '#86efac', borderColor: '#166534' }} onClick={handleSave}>
-              💾 Save
-            </button>
             <button style={{ ...s.toolbarBtn, background: '#7f1d1d', color: '#fca5a5', borderColor: '#7f1d1d' }} onClick={handleDelete}>
               🗑 Delete
             </button>
-            {saveStatus && <span style={{ fontSize: 12, color: '#94a3b8' }}>{saveStatus}</span>}
+            <span style={{ fontSize: 12, color: '#94a3b8', minWidth: 120, textAlign: 'right' }}>{saveStatus || ' '}</span>
           </div>
         </div>
 
