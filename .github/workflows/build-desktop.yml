@@ -31,11 +31,16 @@ jobs:
         run: |
           mkdir -p chimera-desktop/src-tauri/bin
           cp chimera-desktop/supervisor/supervisor chimera-desktop/src-tauri/bin/supervisor-x86_64-unknown-linux-gnu
-      - name: Install frontend deps
+      - name: Build QVAC frontend
+        run: |
+          cd qvac/frontend
+          npm install
+          npm run build
+      - name: Install desktop deps
         run: |
           cd chimera-desktop
           npm install
-      - name: Build frontend
+      - name: Build desktop frontend
         run: |
           cd chimera-desktop
           npm run build
@@ -72,11 +77,16 @@ jobs:
         run: |
           mkdir -p chimera-desktop/src-tauri/bin
           copy chimera-desktop/supervisor/supervisor.exe chimera-desktop/src-tauri/bin/supervisor-x86_64-pc-windows-msvc.exe
-      - name: Install frontend deps
+      - name: Build QVAC frontend
+        run: |
+          cd qvac/frontend
+          npm install
+          npm run build
+      - name: Install desktop deps
         run: |
           cd chimera-desktop
           npm install
-      - name: Build frontend
+      - name: Build desktop frontend
         run: |
           cd chimera-desktop
           npm run build
@@ -117,11 +127,16 @@ jobs:
         run: |
           mkdir -p chimera-desktop/src-tauri/bin
           cp chimera-desktop/supervisor/supervisor chimera-desktop/src-tauri/bin/supervisor-universal-apple-darwin
-      - name: Install frontend deps
+      - name: Build QVAC frontend
+        run: |
+          cd qvac/frontend
+          npm install
+          npm run build
+      - name: Install desktop deps
         run: |
           cd chimera-desktop
           npm install
-      - name: Build frontend
+      - name: Build desktop frontend
         run: |
           cd chimera-desktop
           npm run build
