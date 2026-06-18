@@ -19,7 +19,7 @@ const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.join(__dirname, '..', '..', 'frontend', 'dist');
 
 export class WebServer {
-  constructor(config, nodeManager = null) {
+  constructor(config, nodeManager = null, relayServer = null) {
     this.config = config;
     this.nodeManager = nodeManager;
     this.logger = new Logger('WebServer');
@@ -27,7 +27,7 @@ export class WebServer {
     this.port = process.env.PORT || 3002;
     this.indexer = new MarkdownIndexer();
     this.orchestrator = new NodeOrchestrator();
-    this.relay = new RelayServer({ port: 8765 });
+    this.relay = relayServer || new RelayServer({ port: 8765 });
   }
 
   async initialize() {
@@ -117,14 +117,6 @@ Copy the topic hex and invite others to join.
     this.server.listen(this.port, () => {
       this.logger.info(`Web server listening on port ${this.port}`);
     });
-    
-    // Start relay server for iOS/mobile edge inference
-    try {
-      await this.relay.start();
-      this.logger.info('Relay server started for mobile edge inference');
-    } catch (err) {
-      this.logger.warn(`Relay server failed to start: ${err.message}`);
-    }
   }
   
   async stop() {
@@ -250,6 +242,22 @@ Copy the topic hex and invite others to join.
       deviceIds: devices,
       relayPort: this.relay?.port || null
     });
+  }
+
+  async handleRelayEarnings(req, res) {
+    if (!this.relay) { ok(res, { earnings: {} }); return; }
+    ok(res, { earnings: this.relay.getAllEarnings() });
+  }
+
+  async handleRelayDevices(req, res) {
+    if (!this.relay) { ok(res, { devices: [] }); return; }
+    const deviceIds = this.relay.getConnectedDevices();
+    const devices = deviceIds.map(id => ({
+      id,
+      connected: this.relay.isDeviceConnected(id),
+      earnings: this.relay.getEarnings(id)
+    }));
+    ok(res, { devices });
   }
   
   async handleAIWrite(req, res) {

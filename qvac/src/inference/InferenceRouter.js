@@ -1,8 +1,9 @@
 import { Logger } from '../core/Logger.js';
 
 export class InferenceRouter {
-  constructor(qvacInferenceLayer) {
+  constructor(qvacInferenceLayer, relayServer = null) {
     this.qvacInference = qvacInferenceLayer;
+    this.relay = relayServer;
     this.logger = new Logger('InferenceRouter');
     this.activeRoutes = new Map();
     this.isRunning = false;
@@ -24,8 +25,31 @@ export class InferenceRouter {
 
     const routeId = `${minerName}-${task.id || Date.now()}`;
     
+    // Try mobile devices first if relay is available and has connected devices
+    if (this.relay && this.relay.getConnectedDevices().length > 0) {
+      try {
+        const deviceId = this.selectDevice();
+        this.logger.info(`Forwarding inference to mobile device: ${deviceId}`);
+        const result = await this.relay.forwardInference(deviceId, task.prompt || task.input || '', task.maxTokens || 128);
+        
+        this.logger.info(`Mobile inference completed for ${minerName} via ${deviceId}: ${routeId}`);
+        this.relay.recordEarning(deviceId, minerName, task.id || routeId);
+        
+        return {
+          success: true,
+          routeId,
+          miner: minerName,
+          device: deviceId,
+          source: 'mobile',
+          result: { output: result.output, tokens: result.tokensGenerated }
+        };
+      } catch (relayError) {
+        this.logger.warn(`Mobile inference failed, falling back to local: ${relayError.message}`);
+      }
+    }
+    
     try {
-      // Route all inference through the centralized QVAC inference layer
+      // Route through the centralized QVAC inference layer
       const result = await this.qvacInference.handleInferenceRequest({
         ...task,
         source: minerName,
@@ -38,6 +62,7 @@ export class InferenceRouter {
         success: true,
         routeId,
         miner: minerName,
+        source: 'local',
         result
       };
     } catch (error) {
@@ -49,6 +74,12 @@ export class InferenceRouter {
         error: error.message
       };
     }
+  }
+
+  selectDevice() {
+    const devices = this.relay.getConnectedDevices();
+    // Round-robin selection
+    return devices[Math.floor(Math.random() * devices.length)];
   }
 
   async start() {

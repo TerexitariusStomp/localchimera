@@ -10,6 +10,7 @@ import { TaskMonitor } from '../scheduler/TaskMonitor.js';
 import { WebServer } from '../web/server.js';
 import { WalletManager } from './WalletManager.js';
 import { MultisigManager } from './MultisigManager.js';
+import { RelayServer } from '../relay/server.js';
 
 export class NodeManager {
   constructor(config) {
@@ -26,6 +27,7 @@ export class NodeManager {
     this.webServer = null;
     this.walletManager = null;
     this.multisigManager = null;
+    this.relay = null;
     this.isRunning = false;
   }
 
@@ -64,8 +66,11 @@ export class NodeManager {
     this.inferenceLayer = new QVACInferenceLayer(this.config.inference, this.taskMonitor);
     await this.inferenceLayer.initialize();
     
-    // Initialize centralized inference router
-    this.inferenceRouter = new InferenceRouter(this.inferenceLayer);
+    // Initialize relay server for mobile edge inference
+    this.relay = new RelayServer({ port: this.config.relay?.port || 8765 });
+    
+    // Initialize centralized inference router (with relay for mobile forwarding)
+    this.inferenceRouter = new InferenceRouter(this.inferenceLayer, this.relay);
     await this.inferenceRouter.initialize();
 
     // Initialize local LLM for AI writing
@@ -76,8 +81,8 @@ export class NodeManager {
     this.minerManager = new MinerManager(this.config.miners, this.dataStore, this.taskMonitor, this.inferenceRouter);
     await this.minerManager.initialize();
     
-    // Initialize web server for dashboard API
-    this.webServer = new WebServer(this.config.web || {}, this);
+    // Initialize web server for dashboard API (pass existing relay)
+    this.webServer = new WebServer(this.config.web || {}, this, this.relay);
     await this.webServer.initialize();
     
     this.logger.info('All components initialized successfully');
@@ -143,6 +148,14 @@ export class NodeManager {
     // Start centralized inference router
     await this.inferenceRouter.start();
     
+    // Start relay server for mobile edge inference
+    try {
+      await this.relay.start();
+      this.logger.info('Relay server started for mobile edge inference');
+    } catch (err) {
+      this.logger.warn(`Relay server failed to start: ${err.message}`);
+    }
+    
     // Start miner manager
     await this.minerManager.start();
     
@@ -165,6 +178,7 @@ export class NodeManager {
     // Stop components in reverse order
     await this.webServer.stop();
     await this.minerManager.stop();
+    if (this.relay) await this.relay.stop();
     await this.inferenceRouter.stop();
     await this.inferenceLayer.stop();
     await this.taskMonitor.stop();

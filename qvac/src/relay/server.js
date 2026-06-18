@@ -9,6 +9,7 @@ export class RelayServer extends EventEmitter {
     this.token = options.token || process.env.RELAY_TOKEN || 'chimera-relay-default';
     this.devices = new Map();
     this.pendingRequests = new Map();
+    this.earnings = new Map(); // deviceId -> { tasks: [], totalTokens: 0 }
     this.server = null;
     this.wss = null;
   }
@@ -81,7 +82,8 @@ export class RelayServer extends EventEmitter {
     ws.send(JSON.stringify({
       type: 'connected',
       deviceId,
-      message: 'Relay connected. Waiting for inference tasks.'
+      message: 'Relay connected. Waiting for inference tasks.',
+      earningStatus: this.getEarnings(deviceId)
     }));
   }
 
@@ -103,7 +105,7 @@ export class RelayServer extends EventEmitter {
     }
 
     const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    
+
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pendingRequests.delete(requestId);
@@ -120,6 +122,26 @@ export class RelayServer extends EventEmitter {
         }
       });
     });
+  }
+
+  recordEarning(deviceId, minerName, taskId, tokens = 0) {
+    const record = this.earnings.get(deviceId) || { tasks: [], totalTokens: 0 };
+    record.tasks.push({ taskId, miner: minerName, timestamp: Date.now(), tokens });
+    record.totalTokens += tokens;
+    this.earnings.set(deviceId, record);
+    this.emit('earningRecorded', { deviceId, miner: minerName, taskId, tokens });
+  }
+
+  getEarnings(deviceId) {
+    return this.earnings.get(deviceId) || { tasks: [], totalTokens: 0 };
+  }
+
+  getAllEarnings() {
+    const all = {};
+    for (const [id, record] of this.earnings) {
+      all[id] = record;
+    }
+    return all;
   }
 
   getConnectedDevices() {
