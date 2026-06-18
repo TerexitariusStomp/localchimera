@@ -11,7 +11,7 @@ oUQDQgAEJ9jdXMqmAORbNuWY2Q74wmtsZ++Bvf696PpYOZepHqWCFmTFZDzW+JYO
 fZf7vQid4otudHLFJBWkiazcayJz9g==
 -----END EC PRIVATE KEY-----`;
 
-const CONTRACT_HASH = '4010a38b48966561c27476432287247eab383ceb09bd38b244b66155601c4c1f';
+const CONTRACT_HASH = '94ed6b51b13f65a81e389b3a884a0ae1e1208dcc7e1aed809c88626f89b26f21';
 
 function hexToBytes(hex) {
   const bytes = new Uint8Array(32);
@@ -26,35 +26,12 @@ async function main() {
   
   console.log('Account hash:', accountHashHex);
   
-  // Get contract_purse from contract named keys
-  const resp = await fetch(RPC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'query_global_state',
-      params: { key: 'hash-' + CONTRACT_HASH, path: [] }
-    })
-  });
-  const data = await resp.json();
-  const namedKeys = data.result?.stored_value?.Contract?.named_keys || [];
-  const contractPurse = namedKeys.find(k => k.name === 'contract_purse')?.key;
-  console.log('Contract purse:', contractPurse);
-  
-  if (!contractPurse) {
-    console.error('No contract_purse found');
-    return;
-  }
-  
   const argsMap = {
     consumer: CLValue.newCLByteArray(hexToBytes(accountHashHex)),
     provider: CLValue.newCLByteArray(hexToBytes('f227d4fb7c50164d363c5461ad0044ef8f3b8ad5ee7072b87384e101a2a4263d')),
     amount: CLValue.newCLUInt512('1000'),
     provider_fee_bps: CLValue.newCLUint64('100'),
-    order_id: CLValue.newCLString('test-job-3'),
-    contract_hash: CLValue.newCLByteArray(hexToBytes(CONTRACT_HASH)),
-    contract_purse: CLValue.newCLUref(sdk.URef.fromString(contractPurse)),
+    order_id: CLValue.newCLString('test-job-4'),
   };
   
   const args = Args.fromMap(argsMap);
