@@ -557,6 +557,8 @@
     if (os === 'windows') {
       return assets.find(a => /chimera.*windows.*\.msi$/i.test(a.name))
         || assets.find(a => /chimera.*windows.*\.exe$/i.test(a.name))
+        || assets.find(a => /chimera.*x64.*\.msi$/i.test(a.name))
+        || assets.find(a => /chimera.*x64.*\.exe$/i.test(a.name))
         || assets.find(a => /windows.*\.msi$/i.test(a.name))
         || assets.find(a => /windows.*\.exe$/i.test(a.name))
         || assets.find(a => a.name.toLowerCase().endsWith('.msi'))
@@ -565,6 +567,8 @@
     if (os === 'macos') {
       return assets.find(a => /chimera.*mac.*\.dmg$/i.test(a.name))
         || assets.find(a => /chimera.*darwin.*\.dmg$/i.test(a.name))
+        || assets.find(a => /chimera.*aarch64.*\.dmg$/i.test(a.name))
+        || assets.find(a => /chimera.*amd64.*\.dmg$/i.test(a.name))
         || assets.find(a => /mac.*\.dmg$/i.test(a.name))
         || assets.find(a => /darwin.*\.dmg$/i.test(a.name))
         || assets.find(a => a.name.toLowerCase().endsWith('.dmg'))
@@ -573,6 +577,8 @@
     if (os === 'linux') {
       return assets.find(a => /chimera.*linux.*\.deb$/i.test(a.name))
         || assets.find(a => /chimera.*linux.*\.appimage$/i.test(a.name))
+        || assets.find(a => /chimera.*amd64.*\.deb$/i.test(a.name))
+        || assets.find(a => /chimera.*x86_64.*\.rpm$/i.test(a.name))
         || assets.find(a => /linux.*\.deb$/i.test(a.name))
         || assets.find(a => /linux.*\.appimage$/i.test(a.name))
         || assets.find(a => a.name.toLowerCase().endsWith('.deb'))
