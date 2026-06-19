@@ -11,7 +11,7 @@ oUQDQgAEJ9jdXMqmAORbNuWY2Q74wmtsZ++Bvf696PpYOZepHqWCFmTFZDzW+JYO
 fZf7vQid4otudHLFJBWkiazcayJz9g==
 -----END EC PRIVATE KEY-----`;
 
-const CONTRACT_HASH = 'b922171c95bb26bb8c505b1089a15e8d1f8c54e4cde6a271cf228d559bb00d92';
+const CONTRACT_HASH = 'efbf9bc1257159e37cd8610ede623b65195854f5bca23b8c1b4c9dda4089f54e';
 
 function hexToBytes(hex) {
   const bytes = new Uint8Array(32);
