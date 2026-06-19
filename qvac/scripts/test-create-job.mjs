@@ -11,7 +11,7 @@ oUQDQgAEJ9jdXMqmAORbNuWY2Q74wmtsZ++Bvf696PpYOZepHqWCFmTFZDzW+JYO
 fZf7vQid4otudHLFJBWkiazcayJz9g==
 -----END EC PRIVATE KEY-----`;
 
-const CONTRACT_HASH = '161f9eb54e9bcdc7345084285243ba718abc4ac5601132e8d069c0df6157fb74';
+const CONTRACT_HASH = 'ddda47b19265d93ec767801700c33cb9eef1adbeca345e0cb6bed0b5fcc3131b';
 
 function hexToBytes(hex) {
   const bytes = new Uint8Array(32);
@@ -35,7 +35,7 @@ async function main() {
     amount: CLValue.newCLUInt512('1000'),
     provider_fee_bps: CLValue.newCLUint64('100'),
     order_id: CLValue.newCLString('test-job-5'),
-    contract_hash: CLValue.newCLByteArray(hexToBytes(CONTRACT_HASH)),
+    contract_purse: CLValue.newCLUref(URef.fromString('uref-e02676292b1d6195a21122c89ebc405af79f45823c53ac823273b25aefbb4ebf-004')),
   };
   
   const args = Args.fromMap(argsMap);

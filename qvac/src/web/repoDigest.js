@@ -2,6 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
+import { convertRepoToMarkdown } from './repoToMarkdownAdapter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -160,10 +161,22 @@ export async function repoToMarkdown(input) {
   const { path: dirPath, url } = input;
 
   if (url) {
-    // GitHub URL: try to clone
-    const tmp = process.env.TMPDIR || '/tmp';
+    // Use upstream repo-to-markdown adapter for GitHub URLs
+    // (fetches via GitHub API instead of cloning)
     try {
-      return await cloneAndDigest(url, tmp);
+      const { content, stats } = await convertRepoToMarkdown(url, {
+        includeFilenames: true,
+        addSeparators: true,
+      });
+      return {
+        success: true,
+        data: {
+          markdown: content,
+          fileCount: stats.processed,
+          rootDir: url,
+          stats,
+        },
+      };
     } catch (e) {
       return { success: false, error: e.message };
     }

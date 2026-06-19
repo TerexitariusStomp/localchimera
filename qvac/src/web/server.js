@@ -95,6 +95,57 @@ Copy the topic hex and invite others to join.
     }
   }
   
+  /* ─── Upstream Python Bridge Helpers ─── */
+
+  async _callPyBridge(scriptPath, args) {
+    return new Promise((resolve, reject) => {
+      const py = spawn('/usr/bin/python3', [scriptPath, ...args], {
+        timeout: 30000,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
+      let out = '', err = '';
+      py.stdout.on('data', d => { out += d; });
+      py.stderr.on('data', d => { err += d; });
+      py.on('close', code => {
+        if (code !== 0) {
+          this.logger.warn(`[bridge] ${path.basename(scriptPath)} stderr: ${err.trim()}`);
+          reject(new Error(err.trim() || `bridge exited ${code}`));
+        } else {
+          try { resolve(JSON.parse(out.trim())); }
+          catch { resolve({ success: false, error: 'Invalid JSON from bridge' }); }
+        }
+      });
+    });
+  }
+
+  async otterwiki(action, params = {}) {
+    const script = path.join(__dirname, '..', 'llmwiki', 'otterwiki_bridge.py');
+    const args = [action];
+    for (const [k, v] of Object.entries(params)) {
+      args.push(`--${k.replace(/_/g, '-')}`, String(v));
+    }
+    try {
+      return await this._callPyBridge(script, args);
+    } catch (e) {
+      this.logger.warn(`[otterwiki] Bridge error: ${e.message}`);
+      return { success: false, error: e.message };
+    }
+  }
+
+  async openviking(action, params = {}) {
+    const script = path.join(__dirname, '..', 'llmwiki', 'openviking_bridge.py');
+    const args = [action];
+    for (const [k, v] of Object.entries(params)) {
+      args.push(`--${k.replace(/_/g, '-')}`, String(v));
+    }
+    try {
+      return await this._callPyBridge(script, args);
+    } catch (e) {
+      this.logger.warn(`[openviking] Bridge error: ${e.message}`);
+      return { success: false, error: e.message };
+    }
+  }
+
   async start() {
     this.logger.info('Starting web server...');
     
@@ -378,7 +429,17 @@ Copy the topic hex and invite others to join.
 
   async handleLLMWikiDocs(req, res) {
     await this.indexer.ensureFresh();
-    ok(res, this.indexer.listDocuments());
+    const docs = this.indexer.listDocuments();
+    // Also query OtterWiki upstream backend
+    const ow = await this.otterwiki('list');
+    if (ow.success && ow.pages) {
+      for (const p of ow.pages) {
+        if (!docs.find(d => d.path === p)) {
+          docs.push({ id: p.replace('.md',''), title: p.replace('.md','').replace(/_/g,' '), path: p, category: 'concepts' });
+        }
+      }
+    }
+    ok(res, docs);
   }
 
   async handleLLMWikiSearch(req, res) {
@@ -387,7 +448,17 @@ Copy the topic hex and invite others to join.
     const tags = (url.searchParams.get('tags') || '').split(',').filter(Boolean);
     const category = url.searchParams.get('category') || '';
     await this.indexer.ensureFresh();
-    ok(res, this.indexer.search(query, { tags, category }));
+    const results = this.indexer.search(query, { tags, category });
+    // Also search OtterWiki upstream backend
+    const ow = await this.otterwiki('search', { query });
+    if (ow.success && ow.results) {
+      for (const r of ow.results) {
+        if (!results.find(x => x.path === r.filename)) {
+          results.push({ id: r.filename.replace('.md',''), title: r.filename.replace('.md','').replace(/_/g,' '), path: r.filename, snippet: r.snippet });
+        }
+      }
+    }
+    ok(res, results);
   }
 
   async handleWikiStatus(req, res) {
@@ -416,6 +487,8 @@ Copy the topic hex and invite others to join.
     const url = new URL(req.url, `http://${req.headers.host}`);
     const id = url.searchParams.get('id') || '';
     if (!id) { badRequest(res, 'id is required'); return; }
+    // Also delete from OtterWiki upstream backend
+    await this.otterwiki('delete', { title: id });
     const removed = await this.indexer.removeDocument(id);
     if (removed) ok(res, { deleted: true });
     else badRequest(res, 'Document not found');
@@ -441,11 +514,24 @@ Copy the topic hex and invite others to join.
     const today = new Date().toISOString().split('T')[0];
 
     const frontmatter = `---\nid: ${conceptId}\ntitle: ${title}\ndescription: AI-generated wiki page\ntags: ${JSON.stringify(tags)}\ncreated: ${today}\nmodified: ${today}\n---\n\n`;
+    const fullContent = frontmatter + content;
 
     try {
       await fs.mkdir(wikiDir, { recursive: true });
-      await fs.writeFile(filePath, frontmatter + content, 'utf-8');
+      await fs.writeFile(filePath, fullContent, 'utf-8');
       this.logger.info(`[llmwiki] Saved ${filePath}`);
+
+      // ─── OtterWiki upstream backend ───
+      const ow = await this.otterwiki('save', { title, content: fullContent, message: `Save ${title}` });
+      if (ow.success) {
+        this.logger.info(`[otterwiki] Saved ${title} → ${ow.filename}`);
+      }
+
+      // ─── OpenViking memory store ───
+      const ov = await this.openviking('store', { content: fullContent, role: 'assistant' });
+      if (ov.success) {
+        this.logger.info(`[openviking] Stored memory for ${title}`);
+      }
 
       // ─── Hypercore persistence ───
       if (this.nodeManager?.dataStore) {
@@ -454,7 +540,7 @@ Copy the topic hex and invite others to join.
           title,
           category,
           tags,
-          content: frontmatter + content,
+          content: fullContent,
           filePath,
           createdAt: Date.now()
         });
@@ -465,7 +551,7 @@ Copy the topic hex and invite others to join.
       const p2p = this.nodeManager?.p2pNetwork;
       if (p2p) {
         const pageId = conceptId;
-        const msg = { type: 'wiki-new-page', title, category, fileName, content: frontmatter + content, tags, timestamp: Date.now() };
+        const msg = { type: 'wiki-new-page', title, category, fileName, content: fullContent, tags, timestamp: Date.now() };
 
         // Broadcast to wiki-wide swarms
         const wikiTopics = p2p.getTopicsByScope('wiki');

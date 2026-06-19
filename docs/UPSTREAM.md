@@ -28,15 +28,15 @@ This repo integrates and extends several open-source projects. This document tra
 | Project | Upstream Repo | How We Consume | Our Code | Update Method |
 |---|---|---|---|---|
 | **LLMwiki** | `github.com/lucasastorian/llmwiki` | **Git submodule** — vendored in `upstream/llmwiki/` | `qvac/src/llmwiki/bridge.py` | `git submodule update --remote upstream/llmwiki` |
-| **Openviking** | `github.com/volcengine/OpenViking` | **Git submodule** — vendored in `upstream/openviking/` | N/A (review for future integration) | `git submodule update --remote upstream/openviking` |
-| **OtterWiki** | `github.com/redimp/otterwiki` | **Git submodule** — vendored in `upstream/otterwiki/` | N/A (review for UX ideas) | `git submodule update --remote upstream/otterwiki` |
+| **Openviking** | `github.com/volcengine/OpenViking` | **Git submodule** — vendored in `upstream/openviking/` | `qvac/src/llmwiki/openviking_bridge.py` (HTTP client) | `git submodule update --remote upstream/openviking` |
+| **OtterWiki** | `github.com/redimp/otterwiki` | **Git submodule** — vendored in `upstream/otterwiki/` | `qvac/src/llmwiki/otterwiki_bridge.py` (GitStorage wrapper) | `git submodule update --remote upstream/otterwiki` |
 | **Knowledge Catalog / OKF** | `github.com/GoogleCloudPlatform/knowledge-catalog` | **Git submodule** — vendored in `upstream/knowledge-catalog/` | `docs/UPSTREAM.md` (OKF spec) | `git submodule update --remote upstream/knowledge-catalog` |
 
 ## Tools / File Conversion
 
 | Project | Upstream Repo | How We Consume | Our Code | Update Method |
 |---|---|---|---|---|
-| **repo-to-markdown** | `github.com/puter-apps/repo-to-markdown` | **Git submodule** — vendored in `upstream/repo-to-markdown/` | `qvac/src/web/repoDigest.js` | `git submodule update --remote upstream/repo-to-markdown` |
+| **repo-to-markdown** | `github.com/puter-apps/repo-to-markdown` | **Git submodule** — vendored in `upstream/repo-to-markdown/` | `qvac/src/web/repoToMarkdownAdapter.js` + `repoDigest.js` | `git submodule update --remote upstream/repo-to-markdown` |
 | **markitdown** | `github.com/microsoft/markitdown` | **Git submodule** — installed via `requirements.txt` (`-e ../upstream/markitdown/packages/markitdown`) | `qvac/src/web/server.js` (`handleConvertToMd`) | `git submodule update --remote upstream/markitdown` |
 
 ## Git Submodules (Upstream Code We Use Directly)
@@ -75,8 +75,8 @@ git submodule update --remote upstream/knowledge-catalog
 | `microsoft/markitdown` | `upstream/markitdown/` | `pip install -e upstream/markitdown/packages/markitdown` |
 | `lucasastorian/llmwiki` | `upstream/llmwiki/` | Referenced directly; thin wrapper in `qvac/src/llmwiki/` |
 | `puter-apps/repo-to-markdown` | `upstream/repo-to-markdown/` | Referenced directly; custom adapter in `qvac/src/web/repoDigest.js` |
-| `volcengine/OpenViking` | `upstream/openviking/` | Review for context database / indexing integration |
-| `redimp/otterwiki` | `upstream/otterwiki/` | Review for UX ideas |
+| `volcengine/OpenViking` | `upstream/openviking/` | `qvac/src/llmwiki/openviking_bridge.py` — memory storage via HTTP client |
+| `redimp/otterwiki` | `upstream/otterwiki/` | `qvac/src/llmwiki/otterwiki_bridge.py` — git-backed wiki storage |
 | `GoogleCloudPlatform/knowledge-catalog` | `upstream/knowledge-catalog/` | Reference OKF spec at `upstream/knowledge-catalog/okf/SPEC.md` |
 
 ## Updating npm Dependencies
@@ -161,16 +161,34 @@ When upstream changes their protocol or API:
 
 ## Updating Wiki / Knowledge Base
 
-These are now **vendored as git submodules** in `upstream/`. The implementations in `qvac/src/llmwiki/` and `qvac/src/web/` are custom wrappers:
+These are now **vendored as git submodules** in `upstream/` and integrated into the codebase:
 
 - **LLMwiki** — Vendored at `upstream/llmwiki/`. Our `bridge.py` is a thin QVAC-specific wrapper
-- **Openviking** — Vendored at `upstream/openviking/`. Review for context database / indexing integration
-- **OtterWiki** — Vendored at `upstream/otterwiki/`. Review for UX ideas
+- **Openviking** — Vendored at `upstream/openviking/`. Integrated via `qvac/src/llmwiki/openviking_bridge.py` using the pure-Python HTTP client (`SyncHTTPClient`). Stores wiki content as session memory. Requires an OpenViking server running at `OPENVIKING_URL` (default `http://localhost:1933`).
+- **OtterWiki** — Vendored at `upstream/otterwiki/`. Integrated via `qvac/src/llmwiki/otterwiki_bridge.py` wrapping `GitStorage`. All wiki CRUD (`save`, `get`, `list`, `search`, `delete`) delegates to OtterWiki's git-backed storage.
 - **Knowledge Catalog / OKF** — Vendored at `upstream/knowledge-catalog/`. Reference `upstream/knowledge-catalog/okf/SPEC.md`
+
+### How the integrations work
+
+**repo-to-markdown** (`qvac/src/web/repoToMarkdownAdapter.js`)
+- Ports the upstream browser JS logic to Node.js
+- For GitHub URLs: fetches repo tree via GitHub API, downloads raw files, and concatenates into Markdown
+- Local directories still use the directory walker but with upstream-compatible formatting
+
+**OtterWiki** (`qvac/src/llmwiki/otterwiki_bridge.py`)
+- Wraps `otterwiki.gitstorage.GitStorage`
+- Wiki pages are stored in `llmwiki-data/otterwiki/` as a git repository
+- `server.js` calls the bridge via Python subprocess for every wiki operation
+
+**OpenViking** (`qvac/src/llmwiki/openviking_bridge.py`)
+- Uses `SyncHTTPClient` from the upstream SDK (pure Python, no compilation needed)
+- Stores each saved wiki page as an assistant message in the `chimera-default` session
+- Retrieves session context for AI prompts
+- Requires an OpenViking server (start with Docker or cargo)
 
 To incorporate upstream improvements:
 1. Update the submodule: `git submodule update --remote upstream/<name>`
-2. Compare upstream changes against our custom implementations
+2. Compare upstream changes against our wrappers
 3. Port changes manually where applicable
 
 ## Automated Upstream Checks
