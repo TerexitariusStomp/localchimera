@@ -151,6 +151,56 @@ export class CortensorMiner {
     }
   }
 
+  // ─── Auto setup pipeline ───
+
+  async autoSetup() {
+    this.logger.info('=== Cortensor Auto-Setup ===');
+
+    // 1. Generate keys if needed
+    const keyFile = join(this.cortensorHome, 'node.key');
+    if (!existsSync(keyFile)) {
+      this.logger.info('Node key not found — generating...');
+      await this.genKey();
+    } else {
+      this.logger.info('Node key already exists');
+    }
+
+    // 2. Check if private key is still the placeholder
+    const envContent = await import('fs').then(m => m.promises.readFile(this.envFile, 'utf-8').catch(() => ''));
+    if (envContent.includes('REPLACE_WITH_YOUR_PRIVATE_KEY')) {
+      this.logger.error('============================================================');
+      this.logger.error('NODE_PRIVATE_KEY is still the placeholder in ~/.cortensor/.env');
+      this.logger.error('Replace it with your actual private key before registration.');
+      this.logger.error('============================================================');
+      return false;
+    }
+
+    // 3. Try register (may fail if not whitelisted yet — that's OK)
+    if (!this.registered) {
+      this.logger.info('Attempting registration (may fail until whitelisted)...');
+      const ok = await this.register();
+      if (!ok) {
+        this.logger.warn('Registration not yet successful — likely not whitelisted.');
+        this.logger.warn('Contact Cortensor Admin with your wallet address:');
+        this.logger.warn(this.walletAddress);
+        return false;
+      }
+    }
+
+    // 4. Try verify
+    if (!this.verified) {
+      this.logger.info('Attempting verification...');
+      const ok = await this.verify();
+      if (!ok) {
+        this.logger.warn('Verification not yet successful.');
+        return false;
+      }
+    }
+
+    this.logger.info('Cortensor setup complete — ready to mine');
+    return true;
+  }
+
   // ─── Lifecycle ───
 
   async start() {
@@ -160,6 +210,14 @@ export class CortensorMiner {
       this.logger.error('Cannot start — cortensord not installed');
       this.logger.error('Install: https://github.com/cortensor/installer');
       this.isRunning = false;
+      return;
+    }
+
+    // Run auto-setup (gen_key → register → verify) before mining
+    const ready = await this.autoSetup();
+    if (!ready) {
+      this.logger.warn('Cortensor setup incomplete — miner not started');
+      this.logger.warn('Fix NODE_PRIVATE_KEY in ~/.cortensor/.env and/or get whitelisted, then restart');
       return;
     }
 
@@ -198,7 +256,7 @@ export class CortensorMiner {
 
     this.isRunning = true;
     this.logger.info('Cortensor miner started');
-    this.logger.info('Your node will appear at https://cortensor.network once registered + verified');
+    this.logger.info('Your node will appear at https://cortensor.network once online');
   }
 
   async startMonitoring() {

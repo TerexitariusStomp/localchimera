@@ -34,7 +34,7 @@
       "enabled": true,
       "config": {
         "network": "arbitrum-testnet",
-        "walletAddress": "",
+        "walletAddress": "0x40fC1634DdF154234F4D0dE046d8443998d013a3",
         "protocolAddress": "0xChimeraProtocolCortensorMultisig0001",
         "cortensorHome": "~/.cortensor",
         "envFile": "~/.cortensor/.env",
