@@ -27,8 +27,8 @@ This repo integrates and extends several open-source projects. This document tra
 
 | Project | Upstream Repo | How We Consume | Our Code | Update Method |
 |---|---|---|---|---|
-| **LLMwiki** | `github.com/lucasastorian/llmwiki` | Concept + custom bridge | `qvac/src/llmwiki/bridge.py` | Compare upstream, port improvements |
-| **Openviking** | `github.com/volcengine/OpenViking` | Concept + custom index | `qvac/src/llmwiki/MarkdownIndexer.js` | Compare upstream indexing approach |
+| **LLMwiki** | `github.com/lucasastorian/llmwiki` | **Git submodule** — vendored in `upstream/llmwiki/` | `qvac/src/llmwiki/bridge.py` | `git submodule update --remote upstream/llmwiki` |
+| **Openviking** | `github.com/volcengine/OpenViking` | Concept reference (not integrated) | N/A | Review upstream for indexing ideas |
 | **OtterWiki** | `github.com/redimp/otterwiki` | Concept reference | N/A (influence only) | Review upstream for UX ideas |
 | **OKF Spec** | `github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md` | Specification reference | `docs/UPSTREAM.md` | Review spec for format changes |
 
@@ -36,8 +36,42 @@ This repo integrates and extends several open-source projects. This document tra
 
 | Project | Upstream Repo | How We Consume | Our Code | Update Method |
 |---|---|---|---|---|
-| **repo-to-markdown** | `github.com/puter-apps/repo-to-markdown` | npm dependency / CLI | `qvac/src/web/server.js` (`handleRepoToMd`) | Check upstream for API/format changes |
-| **markitdown** | `github.com/microsoft/markitdown` | Python CLI | `qvac/src/web/server.js` (`handleConvertToMd`) | Check upstream for converter changes |
+| **repo-to-markdown** | `github.com/puter-apps/repo-to-markdown` | **Git submodule** — vendored in `upstream/repo-to-markdown/` | `qvac/src/web/repoDigest.js` | `git submodule update --remote upstream/repo-to-markdown` |
+| **markitdown** | `github.com/microsoft/markitdown` | **Git submodule** — installed via `requirements.txt` (`-e ../upstream/markitdown/packages/markitdown`) | `qvac/src/web/server.js` (`handleConvertToMd`) | `git submodule update --remote upstream/markitdown` |
+
+## Git Submodules (Upstream Code We Use Directly)
+
+We vendor upstream repos as git submodules so their code is always available and we can import from them directly. This avoids maintaining parallel implementations.
+
+### Initial clone with submodules
+
+```bash
+git clone --recurse-submodules https://github.com/TerexitariusStomp/qvac-chimera.git
+```
+
+### Update all submodules to latest upstream
+
+```bash
+git submodule update --remote --merge
+# Commit the updated submodule refs
+git add upstream/ && git commit -m "chore: bump upstream submodules"
+```
+
+### Individual submodule updates
+
+```bash
+git submodule update --remote upstream/markitdown
+git submodule update --remote upstream/llmwiki
+git submodule update --remote upstream/repo-to-markdown
+```
+
+### Current submodules
+
+| Submodule | Path | Installed Via |
+|---|---|---|
+| `microsoft/markitdown` | `upstream/markitdown/` | `pip install -e upstream/markitdown/packages/markitdown` |
+| `lucasastorian/llmwiki` | `upstream/llmwiki/` | Referenced directly; thin wrapper in `qvac/src/llmwiki/` |
+| `puter-apps/repo-to-markdown` | `upstream/repo-to-markdown/` | Referenced directly; custom adapter in `qvac/src/web/repoDigest.js` |
 
 ## Updating npm Dependencies
 

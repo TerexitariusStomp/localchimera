@@ -1,0 +1,9 @@
+[submodule "upstream/repo-to-markdown"]
+	path = upstream/repo-to-markdown
+	url = https://github.com/puter-apps/repo-to-markdown.git
+[submodule "upstream/markitdown"]
+	path = upstream/markitdown
+	url = https://github.com/microsoft/markitdown.git
+[submodule "upstream/llmwiki"]
+	path = upstream/llmwiki
+	url = https://github.com/lucasastorian/llmwiki.git

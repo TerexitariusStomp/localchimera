@@ -8,3 +8,5 @@ geojson==4.0.3
 folium==0.14.0
 pydantic-geospatial==0.3.0
 python-dotenv==1.0.0
+# Upstream: microsoft/markitdown (submodule in upstream/markitdown)
+-e ../upstream/markitdown/packages/markitdown

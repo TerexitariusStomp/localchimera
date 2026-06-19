@@ -349,14 +349,10 @@ Copy the topic hex and invite others to join.
     await fs.writeFile(tmpPath, filePart.data);
 
     try {
-      this.logger.info(`[markitdown] Converting ${filePart.filename}...`);
+      this.logger.info(`[markitdown] Converting ${filePart.filename} via upstream/microsoft-markitdown...`);
       const { spawn } = await import('child_process');
-      const py = spawn('/usr/bin/python3', ['-c', `
-from markitdown import MarkItDown
-md = MarkItDown()
-result = md.convert("${tmpPath.replace(/"/g, '\\"')}")
-print(result.text_content)
-`], { timeout: 60000 });
+      // Use upstream markitdown as a Python module (installed from submodule)
+      const py = spawn('/usr/bin/python3', ['-m', 'markitdown', tmpPath], { timeout: 60000 });
 
       let out = '', err = '';
       py.stdout.on('data', d => { out += d; });
