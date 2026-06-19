@@ -84,8 +84,8 @@
       "config": {
         "network": "bittensor",
         "platform": "https://chutes.ai",
-        "walletAddress": "",
-        "hotkeyAddress": "",
+        "walletAddress": "5GLC1oKLPWXrXgbT7DdK2BWdiZjLCjRSFtjiJHNDjnG5mGNz",
+        "hotkeyAddress": "5GLC1oKLPWXrXgbT7DdK2BWdiZjLCjRSFtjiJHNDjnG5mGNz",
         "apiKey": "",
         "apiBaseUrl": "https://api.chutes.ai",
         "inferenceBaseUrl": "https://llm.chutes.ai/v1",
