@@ -632,13 +632,7 @@
 
       const asset = pickAsset(data.assets || [], os);
       if (asset && asset.browser_download_url && os !== 'ios') {
-        const a = document.createElement('a');
-        a.href = asset.browser_download_url;
-        a.download = asset.name;
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        window.open(asset.browser_download_url, '_blank');
         document.getElementById('osLabel').textContent = 'Downloading ' + asset.name + '...';
         setTimeout(() => {
           document.getElementById('osLabel').textContent = originalLabel;
