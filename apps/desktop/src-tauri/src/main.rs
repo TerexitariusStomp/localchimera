@@ -150,6 +150,22 @@ struct UpdateCheckResult {
     download_url: String,
 }
 
+fn parse_version(v: &str) -> (u64, u64, u64) {
+    let clean = v.trim_start_matches('v');
+    let core = clean.split('-').next().unwrap_or(clean);
+    let parts: Vec<&str> = core.split('.').collect();
+    let major = parts.get(0).and_then(|s| s.parse().ok()).unwrap_or(0);
+    let minor = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+    let patch = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
+    (major, minor, patch)
+}
+
+fn is_newer(latest: &str, current: &str) -> bool {
+    let l = parse_version(latest);
+    let c = parse_version(current);
+    l > c
+}
+
 #[tauri::command]
 async fn check_for_updates() -> Result<UpdateCheckResult, String> {
     const API: &str = "https://api.github.com/repos/TerexitariusStomp/localchimera/releases/latest";
@@ -164,14 +180,14 @@ async fn check_for_updates() -> Result<UpdateCheckResult, String> {
     let resp = client.get(API).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
 
-    let latest = json["tag_name"]
+    let latest_tag = json["tag_name"]
         .as_str()
         .unwrap_or("v0.0.0")
-        .trim_start_matches('v')
         .to_string();
 
+    let latest = latest_tag.trim_start_matches('v').to_string();
     let current = CURRENT.to_string();
-    let has = latest != current && !latest.is_empty() && latest != "0.0.0";
+    let has = is_newer(&latest_tag, &current) && !latest.is_empty() && latest != "0.0.0";
 
     Ok(UpdateCheckResult {
         has_update: has,
