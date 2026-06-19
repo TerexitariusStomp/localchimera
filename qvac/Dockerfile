@@ -58,6 +58,8 @@ USER chimera
 # Environment
 ENV NODE_ENV=production
 ENV PORT=3002
+ENV OPENVIKING_URL=http://127.0.0.1:1933
+ENV OPENVIKING_API_KEY=chimera-local-dev-key
 
 # Expose wiki web server port
 EXPOSE 3002

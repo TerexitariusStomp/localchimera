@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 """OpenViking Bridge — Plain HTTP Edition
 
-Talks to an OpenViking-compatible server over plain HTTP.
+Talks to the real OpenViking server over plain HTTP.
 Does NOT import anything from the openviking package, so no compiled
 Rust extension (pyagfs) is needed on the client side.
-
-Works with:
-  - The real OpenViking server (ghcr.io/volcengine/openviking:latest)
-  - The OpenViking Shim Server (openviking_shim_server.py)
 
 Upstream: https://github.com/volcengine/OpenViking
 """
