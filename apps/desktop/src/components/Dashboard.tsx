@@ -1,56 +1,48 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
 
 interface Status {
   running: boolean;
-  docker_present: boolean;
-  logs: string;
-  error: string;
-  app_url: string;
+  nodeId: string;
+  inference?: { isRunning?: boolean };
+  mining?: { running: boolean; currentMiner: string | null; availableMiners: string[] };
+  embedding?: { ready?: boolean };
+  p2p?: { running?: boolean; peers?: number };
 }
 
 export function Dashboard() {
   const [status, setStatus] = useState<Status | null>(null);
   const [loading, setLoading] = useState({ start: false, stop: false });
-  const logsRef = useRef<HTMLDivElement>(null);
+  const [backendUrl] = useState("http://localhost:3002");
 
   // Settings state
   const [autoStart, setAutoStart] = useState(false);
   const [desktopIcon, setDesktopIcon] = useState(false);
-  const [taskbarIcon, setTaskbarIcon] = useState(false);
-  const [settingsLoading, setSettingsLoading] = useState({ auto: false, desk: false, task: false });
+  const [settingsLoading, setSettingsLoading] = useState({ auto: false, desk: false });
 
   // Docker status
   const [dockerPresent, setDockerPresent] = useState<boolean | null>(null);
 
-  const apiBase = "http://localhost:";
-  const supervisorPort = "9876";
-
   const fetchStatus = async () => {
-    if (!supervisorPort) return;
     try {
-      const res = await fetch(`${apiBase}${supervisorPort}/status`);
+      const res = await fetch(`${backendUrl}/api/status`);
       const data = await res.json();
       setStatus(data);
-    } catch {}
+    } catch {
+      setStatus(null);
+    }
   };
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 2000);
+    const interval = setInterval(fetchStatus, 3000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     invoke<boolean>("docker_status").then(setDockerPresent).catch(() => setDockerPresent(false));
   }, []);
-
-  useEffect(() => {
-    if (logsRef.current && status?.logs) {
-      logsRef.current.scrollTop = logsRef.current.scrollHeight;
-    }
-  }, [status?.logs]);
 
   // Load current settings on mount
   useEffect(() => {
@@ -79,23 +71,26 @@ export function Dashboard() {
     setSettingsLoading(l => ({ ...l, desk: false }));
   };
 
-  const startApp = async () => {
+  const startMining = async () => {
     setLoading(l => ({ ...l, start: true }));
     try {
-      await fetch(`${apiBase}${supervisorPort}/start`, { method: "POST" });
+      await fetch(`${backendUrl}/api/start`, { method: "POST" });
       await fetchStatus();
     } catch {}
     setLoading(l => ({ ...l, start: false }));
   };
 
-  const stopApp = async () => {
+  const stopMining = async () => {
     setLoading(l => ({ ...l, stop: true }));
     try {
-      await fetch(`${apiBase}${supervisorPort}/stop`, { method: "POST" });
+      await fetch(`${backendUrl}/api/stop`, { method: "POST" });
       await fetchStatus();
     } catch {}
     setLoading(l => ({ ...l, stop: false }));
   };
+
+  const miners = status?.mining?.availableMiners || [];
+  const miningRunning = status?.mining?.running || false;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 800, margin: "0 auto" }}>
@@ -127,39 +122,119 @@ export function Dashboard() {
       }}>
         <div>
           <div style={{ fontSize: 12, color: "#4a4540", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 4 }}>
-            Container Status
+            Node Status
           </div>
           <div style={{ fontSize: 16, fontWeight: 600, color: status?.running ? "#86efac" : "#fca5a5" }}>
             {status?.running ? "🟢 Running" : "⚪ Stopped"}
           </div>
-          {status?.error && (
-            <div style={{ fontSize: 12, color: "#fca5a5", marginTop: 4 }}>
-              Error: {status.error}
-            </div>
+          <div style={{ fontSize: 12, color: "#7a7468", marginTop: 4 }}>
+            {status?.nodeId ? `ID: ${status.nodeId.slice(0, 12)}...` : "Connecting to backend..."}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={() => open(backendUrl)}
+            style={{
+              padding: "8px 18px",
+              borderRadius: 6,
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "#161410",
+              color: "#b0a898",
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            Open App →
+          </button>
+        </div>
+      </div>
+
+      {/* Services grid */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+        gap: 10,
+      }}>
+        {[
+          { label: "Inference", active: status?.inference?.isRunning, color: "#00e5ff" },
+          { label: "Embedding", active: status?.embedding?.ready, color: "#a855f7" },
+          { label: "Mining", active: miningRunning, color: "#22c55e" },
+          { label: "P2P", active: status?.p2p?.running, color: "#f97316" },
+        ].map(s => (
+          <div key={s.label} style={{
+            padding: "12px 14px",
+            borderRadius: 8,
+            border: "1px solid rgba(255,255,255,0.06)",
+            background: "#0b0a09",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: s.active ? s.color : "#450a0a",
+              boxShadow: s.active ? `0 0 6px ${s.color}` : "none",
+            }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: s.active ? "#e8e2d8" : "#7a7468" }}>
+              {s.label}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Mining panel */}
+      <div style={{
+        padding: "16px 20px",
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.06)",
+        background: "#0b0a09",
+      }}>
+        <div style={{ fontSize: 12, color: "#4a4540", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 12 }}>
+          Mining Networks
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+          {miners.length === 0 ? (
+            <span style={{ fontSize: 13, color: "#7a7468" }}>No miners configured</span>
+          ) : (
+            miners.map(m => (
+              <span key={m} style={{
+                padding: "4px 10px",
+                borderRadius: 20,
+                fontSize: 12,
+                fontWeight: 600,
+                background: miningRunning ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.03)",
+                color: miningRunning ? "#22c55e" : "#7a7468",
+                border: `1px solid ${miningRunning ? "rgba(34,197,94,0.2)" : "rgba(255,255,255,0.06)"}`,
+                textTransform: "capitalize",
+              }}>
+                {m}
+              </span>
+            ))
           )}
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          {!status?.running ? (
+          {!miningRunning ? (
             <button
-              onClick={startApp}
-              disabled={loading.start || dockerPresent === false}
+              onClick={startMining}
+              disabled={loading.start || !status?.running}
               style={{
                 padding: "8px 18px",
                 borderRadius: 6,
                 border: "none",
-                background: dockerPresent === false ? "#450a0a" : "#c9a96e",
-                color: dockerPresent === false ? "#fca5a5" : "#0e0d0b",
+                background: !status?.running ? "#161410" : "#c9a96e",
+                color: !status?.running ? "#7a7468" : "#0e0d0b",
                 fontWeight: 600,
                 fontSize: 13,
-                cursor: (loading.start || dockerPresent === false) ? "not-allowed" : "pointer",
-                opacity: (loading.start || dockerPresent === false) ? 0.5 : 1,
+                cursor: (loading.start || !status?.running) ? "not-allowed" : "pointer",
+                opacity: (loading.start || !status?.running) ? 0.5 : 1,
               }}
             >
-              {loading.start ? "Starting..." : dockerPresent === false ? "🐳 Docker Required" : "▶ Start App"}
+              {loading.start ? "Starting..." : "▶ Start Mining"}
             </button>
           ) : (
             <button
-              onClick={stopApp}
+              onClick={stopMining}
               disabled={loading.stop}
               style={{
                 padding: "8px 18px",
@@ -173,51 +248,9 @@ export function Dashboard() {
                 opacity: loading.stop ? 0.6 : 1,
               }}
             >
-              {loading.stop ? "Stopping..." : "⏹ Stop App"}
+              {loading.stop ? "Stopping..." : "⏹ Stop Mining"}
             </button>
           )}
-          {status?.app_url && (
-            <button
-              onClick={() => open(status.app_url)}
-              style={{
-                padding: "8px 18px",
-                borderRadius: 6,
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: "#161410",
-                color: "#b0a898",
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: "pointer",
-              }}
-            >
-              Open App →
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Logs */}
-      <div>
-        <div style={{ fontSize: 12, color: "#4a4540", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 8 }}>
-          Logs
-        </div>
-        <div
-          ref={logsRef}
-          style={{
-            background: "#0b0a09",
-            border: "1px solid rgba(255,255,255,0.06)",
-            borderRadius: 10,
-            padding: 14,
-            height: 320,
-            overflow: "auto",
-            fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace",
-            fontSize: 12,
-            lineHeight: 1.6,
-            color: "#7a7468",
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          {status?.logs || "No logs yet. Start the app to see output."}
         </div>
       </div>
 

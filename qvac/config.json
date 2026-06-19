@@ -31,8 +31,8 @@
     "priority": ["cortensor", "routstr", "chutes", "fortytwo", "earnidle"],
     "switchInterval": 60000,
     "cortensor": {
-      "enabled": false,
-      "note": "Disabled by default until Cortensor is explicitly added later.",
+      "enabled": true,
+      "note": "Cortensor network miner.",
       "config": {
         "network": "arbitrum-testnet",
         "walletAddress": "0x40fC1634DdF154234F4D0dE046d8443998d013a3",
@@ -102,10 +102,11 @@
       }
     },
     "casper": {
-      "enabled": false,
+      "enabled": true,
       "config": {
         "network": "casper-test",
-        "rpcUrl": "http://localhost:7778/rpc"
+        "rpcUrl": "http://localhost:7778/rpc",
+        "providerKeyPem": ""
       }
     }
   },
