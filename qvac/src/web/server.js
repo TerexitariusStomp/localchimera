@@ -345,6 +345,72 @@ Copy the topic hex and invite others to join.
     ok(res, files.sort((a, b) => b.createdAt - a.createdAt));
   }
 
+  // ── Embedding + RAG (QVAC SDK) ──────────────────────────────────────
+
+  async handleEmbedding(req, res) {
+    const svc = this.nodeManager?.embeddingService;
+    if (!svc || !svc.ready) { serviceUnavailable(res, 'Embedding service not ready'); return; }
+
+    const body = await parseBody(req);
+    const texts = body.texts || body.text ? [body.text] : [];
+    if (!texts.length) { badRequest(res, 'Provide "texts" or "text"'); return; }
+
+    try {
+      const vectors = await svc.embed(texts);
+      ok(res, { vectors, count: vectors.length, dimension: vectors[0]?.length || 0 });
+    } catch (e) {
+      this.logger.error(`[embedding] ${e.message}`);
+      serverError(res, e);
+    }
+  }
+
+  async handleRagIngest(req, res) {
+    const svc = this.nodeManager?.embeddingService;
+    if (!svc || !svc.ready) { serviceUnavailable(res, 'Embedding service not ready'); return; }
+
+    const body = await parseBody(req);
+    const { workspace = 'chimera-rag', documents = [] } = body;
+    if (!documents.length) { badRequest(res, 'Provide "documents" array'); return; }
+
+    try {
+      await svc.ragIngest(workspace, documents);
+      ok(res, { workspace, ingested: documents.length });
+    } catch (e) {
+      this.logger.error(`[rag-ingest] ${e.message}`);
+      serverError(res, e);
+    }
+  }
+
+  async handleRagSearch(req, res) {
+    const svc = this.nodeManager?.embeddingService;
+    if (!svc || !svc.ready) { serviceUnavailable(res, 'Embedding service not ready'); return; }
+
+    const body = await parseBody(req);
+    const { workspace = 'chimera-rag', query = '', topK = 5 } = body;
+    if (!query) { badRequest(res, 'Provide "query"'); return; }
+
+    try {
+      const matches = await svc.ragSearch(workspace, query, topK);
+      ok(res, { workspace, query, matches });
+    } catch (e) {
+      this.logger.error(`[rag-search] ${e.message}`);
+      serverError(res, e);
+    }
+  }
+
+  async handleRagWorkspaces(req, res) {
+    const svc = this.nodeManager?.embeddingService;
+    try {
+      const workspaces = await svc?.ragListWorkspaces() || [];
+      ok(res, { workspaces });
+    } catch (e) {
+      this.logger.error(`[rag-workspaces] ${e.message}`);
+      serverError(res, e);
+    }
+  }
+
+  // ── LLM Wiki ────────────────────────────────────────────────────────
+
   async handleLLMWikiCreate(req, res) {
     const body = await parseBody(req);
     const { topic = '', prompt: customPrompt = '', category = 'concepts', tags = [], description = '', links = [] } = body;
@@ -478,8 +544,10 @@ Copy the topic hex and invite others to join.
       otterwikiStatus = { available: ow.success, pages: ow.pages?.length || 0 };
     } catch (e) { /* ignore */ }
 
+    const emb = this.nodeManager?.embeddingService;
     ok(res, {
       qvac: llm ? { available: true, ...llm.getStatus() } : { available: false },
+      embedding: emb ? { available: emb.ready, ...emb.getStatus() } : { available: false },
       hypercore: store ? { available: true, ...store.getStatus() } : { available: false },
       pear: p2p ? { available: true, running: p2p.isRunning, peers: p2p.peers?.size || 0 } : { available: false },
       openviking: openvikingStatus,

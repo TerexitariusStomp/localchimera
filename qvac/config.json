@@ -17,6 +17,12 @@
       "qvacModelConst": "LLAMA_3_2_1B_INST_Q4_0",
       "timeout": 300000
     },
+    "embedding": {
+      "model": "EMBEDDINGGEMMA_300M_Q4_0",
+      "qvacModelConst": "EMBEDDINGGEMMA_300M_Q4_0",
+      "device": "cpu",
+      "workspace": "chimera-rag"
+    },
     "idleTimeout": 300000
   },
   "miners": {

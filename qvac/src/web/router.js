@@ -13,6 +13,11 @@ export const ROUTES = [
   ['POST', '/api/ai-write',           'handleAIWrite'],
   ['GET',  '/api/ai-status',          'handleAIStatus'],
   ['GET',  '/api/ai-docs',            'handleAIDocs'],
+  // Embedding + RAG (QVAC SDK)
+  ['POST', '/api/embedding',          'handleEmbedding'],
+  ['POST', '/api/rag-ingest',         'handleRagIngest'],
+  ['POST', '/api/rag-search',         'handleRagSearch'],
+  ['GET',  '/api/rag-workspaces',     'handleRagWorkspaces'],
   // LLM Wiki
   ['POST', '/api/llmwiki-create',     'handleLLMWikiCreate'],
   ['POST', '/api/llmwiki-upload',     'handleLLMWikiUpload'],

@@ -1,6 +1,7 @@
 import { Logger } from './Logger.js';
 import { QVACInferenceLayer } from '../inference/QVACInferenceLayer.js';
 import { LocalLLM } from '../inference/LocalLLM.js';
+import { EmbeddingService } from '../inference/EmbeddingService.js';
 import { HypercoreStore } from '../storage/HypercoreStore.js';
 import { PearP2P } from '../p2p/PearP2P.js';
 import { MinerManager } from '../miners/MinerManager.js';
@@ -17,6 +18,7 @@ export class NodeManager {
     this.logger = new Logger('NodeManager');
     this.inferenceLayer = null;
     this.localLLM = null;
+    this.embeddingService = null;
     this.dataStore = null;
     this.p2pNetwork = null;
     this.minerManager = null;
@@ -67,7 +69,11 @@ export class NodeManager {
     // Initialize local LLM for AI writing
     this.localLLM = new LocalLLM(this.config.inference?.localLLM || {});
     await this.localLLM.initialize();
-    
+
+    // Initialize embedding service (QVAC SDK)
+    this.embeddingService = new EmbeddingService(this.config.inference?.embedding || {});
+    await this.embeddingService.initialize();
+
     // Initialize miner manager with task monitor and inference layer (each node is standalone)
     this.minerManager = new MinerManager(this.config.miners, this.dataStore, this.taskMonitor, this.inferenceLayer);
     await this.minerManager.initialize();
@@ -140,7 +146,10 @@ export class NodeManager {
     
     // Start inference layer
     await this.inferenceLayer.start();
-    
+
+    // Start embedding service (loads model on first use)
+    await this.embeddingService.start();
+
     // Start miner manager
     await this.minerManager.start();
     
@@ -166,6 +175,7 @@ export class NodeManager {
     // Stop components in reverse order
     await this.webServer.stop();
     await this.minerManager.stop();
+    await this.embeddingService.stop?.();
     await this.inferenceLayer.stop();
     await this.taskMonitor.stop();
     await this.walletManager.disconnectAllWallets();
@@ -186,6 +196,7 @@ export class NodeManager {
       // mode removed
       inference: this.inferenceLayer?.getStatus(),
       localLLM: this.localLLM?.getStatus(),
+      embedding: this.embeddingService?.getStatus(),
       mining: this.minerManager?.getStatus(),
       tasks: this.taskMonitor?.getStatus(),
       p2p: this.p2pNetwork?.getStatus(),
