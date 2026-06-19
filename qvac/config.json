@@ -31,7 +31,8 @@
     "priority": ["cortensor", "routstr", "chutes", "fortytwo", "earnidle"],
     "switchInterval": 60000,
     "cortensor": {
-      "enabled": true,
+      "enabled": false,
+      "note": "Disabled by default until Cortensor is explicitly added later.",
       "config": {
         "network": "arbitrum-testnet",
         "walletAddress": "0x40fC1634DdF154234F4D0dE046d8443998d013a3",
@@ -47,7 +48,7 @@
       "config": {
         "network": "evm",
         "platform": "https://fortytwo.network",
-        "walletAddress": "",
+        "walletAddress": "0x40fC1634DdF154234F4D0dE046d8443998d013a3",
         "protocolAddress": "0xChimeraProtocolFortytwoMultisig0001",
         "nodeName": "Chimera-Fortytwo-Node",
         "apiBase": "https://node.fortytwo.network/api",

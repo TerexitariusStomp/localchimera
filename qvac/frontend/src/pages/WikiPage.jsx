@@ -112,7 +112,7 @@ export default function WikiPage({ onBack }) {
   const [docs, setDocs] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDoc, setSelectedDoc] = useState(null);
-  const [aiOpen, setAiOpen] = useState(true);
+  const [aiOpen, setAiOpen] = useState(typeof window !== 'undefined' ? window.innerWidth > 768 : true);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiTitle, setAiTitle] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -190,6 +190,52 @@ export default function WikiPage({ onBack }) {
   const [autoIntervalRef, setAutoIntervalRef] = useState(null);
   const [autoStatus, setAutoStatus] = useState('');
 
+  // Mobile responsive
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Mobile settings
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [prefBoot, setPrefBoot] = useState(() => localStorage.getItem('chimera_boot') === '1');
+  const [prefHome, setPrefHome] = useState(() => localStorage.getItem('chimera_home') === '1');
+  const [prefAiOpen, setPrefAiOpen] = useState(() => {
+    const v = localStorage.getItem('chimera_ai');
+    return v === null ? true : v === '1'; // default true
+  });
+
+  // Mobile AI sidebar overlay
+  const [aiMobileOpen, setAiMobileOpen] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Respect AI-open preference on mount
+  useEffect(() => {
+    if (isMobile && !prefAiOpen) setAiOpen(false);
+  }, [isMobile, prefAiOpen]);
+
+  // Update check (mobile/web)
+  const [appUpdate, setAppUpdate] = useState(null);
+  useEffect(() => {
+    const CURRENT = '1.0.0'; // bump on release
+    fetch('https://api.github.com/repos/TerexitariusStomp/qvac-chimera/releases/latest', {
+      headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || !data.tag_name) return;
+        const latest = data.tag_name.replace(/^v/, '');
+        if (latest !== CURRENT) {
+          setAppUpdate({ current: CURRENT, latest, url: data.html_url || 'https://github.com/TerexitariusStomp/qvac-chimera/releases/latest' });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // File drop
   const [dropHover, setDropHover] = useState(false);
   const [dropFiles, setDropFiles] = useState([]);
@@ -248,14 +294,18 @@ export default function WikiPage({ onBack }) {
       return;
     }
     localStorage.setItem('chimeraEvmAddress', evmAddress);
-    setSaveStatus('Starting node...');
+    setSaveStatus('Starting miners...');
     try {
-      const res = await fetch(`${API_BASE}/start`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ evmAddress })
+      });
       const text = await res.text();
       const json = text ? JSON.parse(text) : {};
-      if (json.success) {
+      if (res.ok) {
         setNodeRunning(true);
-        setSaveStatus('Node started');
+        setSaveStatus('Miners started');
       } else {
         setSaveStatus(json.error || 'Start failed');
       }
@@ -682,12 +732,134 @@ export default function WikiPage({ onBack }) {
     </button>
   );
 
+  // Mobile overlay click closes menu
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
   return (
-    <div style={s.layout}>
+    <div style={{ ...s.layout, ...(isMobile ? { flexDirection: 'column', height: 'auto', overflow: 'auto' } : {}) }}>
+      {/* Update banner */}
+      {appUpdate && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 400,
+          padding: '8px 12px', background: 'linear-gradient(90deg,#c9a96e22,#00e5ff22)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontSize: 12, color: '#e8e2d8'
+        }}>
+          <span>Update v{appUpdate.latest} available</span>
+          <a href={appUpdate.url} target="_blank" rel="noopener" style={{ color: '#00e5ff', fontWeight: 600 }}>Download →</a>
+        </div>
+      )}
+
+      {/* Mobile hamburger */}
+      {isMobile && (
+        <button
+          onClick={() => setMobileMenuOpen(o => !o)}
+          style={{
+            position: 'fixed', top: appUpdate ? 40 : 8, left: 8, zIndex: 300,
+            width: 36, height: 36, borderRadius: 8,
+            background: '#161410', border: '1px solid rgba(255,255,255,0.1)',
+            color: '#e8e2d8', fontSize: 18, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+          }}
+          aria-label="Menu"
+        >
+          ☰
+        </button>
+      )}
+      {/* Mobile overlay */}
+      {isMobile && mobileMenuOpen && (
+        <div onClick={closeMobileMenu} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 150
+        }} />
+      )}
+
+      {/* Mobile settings gear */}
+      {isMobile && (
+        <button
+          onClick={() => setSettingsOpen(o => !o)}
+          style={{
+            position: 'fixed', top: appUpdate ? 76 : 8, right: 8, zIndex: 300,
+            width: 36, height: 36, borderRadius: 8,
+            background: '#161410', border: '1px solid rgba(255,255,255,0.1)',
+            color: '#b0a898', fontSize: 18, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+          }}
+          aria-label="Settings"
+        >
+          ⚙️
+        </button>
+      )}
+
+      {/* Mobile settings modal */}
+      {isMobile && settingsOpen && (
+        <div onClick={() => setSettingsOpen(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 350,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#0b0a0b', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12,
+            padding: 20, width: '100%', maxWidth: 340, maxHeight: '80vh', overflowY: 'auto'
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e2d8', marginBottom: 16 }}>Settings</div>
+
+            {[
+              { key: 'boot', label: 'Start on device boot', desc: 'Auto-launch when device turns on', val: prefBoot, set: setPrefBoot },
+              { key: 'home', label: 'Add to home screen', desc: 'Install as app icon', val: prefHome, set: setPrefHome },
+              { key: 'ai', label: 'Keep AI panel open', desc: 'Always show AI Writer and Memory', val: prefAiOpen, set: setPrefAiOpen },
+            ].map(row => (
+              <div key={row.key} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)'
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, color: '#b0a898' }}>{row.label}</div>
+                  <div style={{ fontSize: 11, color: '#4a4540', marginTop: 2 }}>{row.desc}</div>
+                </div>
+                <div onClick={() => {
+                  const next = !row.val;
+                  row.set(next);
+                  localStorage.setItem('chimera_' + row.key, next ? '1' : '0');
+                  if (row.key === 'ai' && next) setAiOpen(true);
+                }} style={{
+                  width: 44, height: 24, borderRadius: 12,
+                  background: row.val ? '#00e5ff' : '#161410',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  position: 'relative', cursor: 'pointer', transition: '0.2s'
+                }}>
+                  <div style={{
+                    position: 'absolute', top: 2, left: row.val ? 22 : 2,
+                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                    transition: '0.2s'
+                  }} />
+                </div>
+              </div>
+            ))}
+
+            <button onClick={() => setSettingsOpen(false)} style={{
+              marginTop: 16, width: '100%', padding: '8px 0',
+              background: '#161410', color: '#b0a898',
+              border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6,
+              fontSize: 13, cursor: 'pointer'
+            }}>Close</button>
+          </div>
+        </div>
+      )}
+
       {/* ─── Left Sidebar ─── */}
-      <aside style={s.sidebar}>
+      <aside style={{
+        ...s.sidebar,
+        ...(isMobile ? {
+          position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 200,
+          transform: mobileMenuOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.25s ease',
+          width: 260, minWidth: 260,
+          borderRight: '1px solid rgba(255,255,255,0.1)'
+        } : {})
+      }}>
         <div style={s.sidebarHeader}>
-          <span style={s.logo}>⚡ Chimera</span>
+          <img src="/chimeralogo-header.png" alt="Chimera" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
+          <span style={s.logo}>Chimera</span>
         </div>
         {onBack && (
           <button style={s.backBtn} onClick={onBack}>← Back</button>
@@ -836,10 +1008,10 @@ export default function WikiPage({ onBack }) {
       </aside>
 
       {/* ─── Main Content ─── */}
-      <main style={s.main}>
+      <main style={{ ...s.main, ...(isMobile ? { minHeight: '100vh' } : {}) }}>
         {/* Toolbar */}
-        <div style={s.toolbar}>
-          <div style={s.toolbarGroup}>
+        <div style={{ ...s.toolbar, ...(isMobile ? { flexWrap: 'wrap', gap: 6, padding: '8px 10px 8px 48px' } : {}) }}>
+          <div style={{ ...s.toolbarGroup, ...(isMobile ? { flexWrap: 'wrap' } : {}) }}>
             {toolbarBtn('H1', () => insertAtCursor('# '))}
             {toolbarBtn('H2', () => insertAtCursor('## '))}
             {toolbarBtn('H3', () => insertAtCursor('### '))}
@@ -866,7 +1038,7 @@ export default function WikiPage({ onBack }) {
 
         {/* Editor + Preview */}
         <div
-          style={s.editorPane}
+          style={{ ...s.editorPane, ...(isMobile ? { flexDirection: 'column' } : {}) }}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -877,10 +1049,13 @@ export default function WikiPage({ onBack }) {
             </div>
           )}
           {(view === 'edit' || view === 'split') && (
-            <div style={view === 'split' ? s.splitLeft : s.full}>
+            <div style={view === 'split'
+              ? { ...s.splitLeft, ...(isMobile ? { width: '100%', minHeight: 200, borderRight: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)' } : {}) }
+              : s.full
+            }>
               <textarea
                 ref={editorRef}
-                style={s.textarea}
+                style={{ ...s.textarea, ...(isMobile ? { padding: '12px 14px', fontSize: 13 } : {}) }}
                 value={editorText}
                 onChange={e => { setShowInline(false); setEditorText(e.target.value); }}
                 onMouseUp={trackSelection}
@@ -891,10 +1066,13 @@ export default function WikiPage({ onBack }) {
             </div>
           )}
           {(view === 'preview' || view === 'split') && (
-            <div style={view === 'split' ? s.splitRight : s.full}>
-              <div style={s.preview} dangerouslySetInnerHTML={{ __html: mdToHtml(editorText) }} />
+            <div style={view === 'split'
+              ? { ...s.splitRight, ...(isMobile ? { flexDirection: 'column' } : {}) }
+              : s.full
+            }>
+              <div style={{ ...s.preview, ...(isMobile ? { padding: '14px 16px', fontSize: 13 } : {}) }} dangerouslySetInnerHTML={{ __html: mdToHtml(editorText) }} />
               {toc.length > 0 && (
-                <div style={s.toc}>
+                <div style={{ ...s.toc, ...(isMobile ? { width: '100%', minWidth: 'auto', borderLeft: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', padding: '12px 14px' } : {}) }}>
                   <div style={s.tocTitle}>Contents</div>
                   {toc.map((item, i) => (
                     <div key={i} style={item.level === 3 ? s.tocItem3 : s.tocItem}>
@@ -920,16 +1098,31 @@ export default function WikiPage({ onBack }) {
         </div>
       )}
 
+      {/* AI overlay (mobile only) */}
+      {isMobile && aiMobileOpen && (
+        <div onClick={() => setAiMobileOpen(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 210
+        }} />
+      )}
+
       {/* ─── Right AI Panel ─── */}
-      <aside style={aiOpen ? s.aiPanel : s.aiPanelCollapsed}>
-        <div style={s.aiHeader} onClick={() => setAiOpen(!aiOpen)}>
-          <span>{aiOpen ? '🤖 AI Writer' : '🤖'}</span>
-          <span style={s.aiToggle}>{aiOpen ? '›' : '‹'}</span>
+      <aside id="aiPanel" style={{
+        ...(isMobile ? {
+          position: 'fixed', top: 0, right: 0, bottom: 0,
+          width: '85%', maxWidth: 360, zIndex: 220,
+          background: '#0b0a09', borderLeft: '1px solid rgba(255,255,255,0.1)',
+          transform: aiMobileOpen ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.25s ease',
+          display: 'flex', flexDirection: 'column',
+        } : (aiOpen ? s.aiPanel : s.aiPanelCollapsed))
+      }}>
+        <div style={{ ...s.aiHeader, ...(isMobile ? { flexShrink: 0 } : {}) }} onClick={() => !isMobile && setAiOpen(o => !o)}>
+          <span>🤖 AI Writer</span>
+          <span style={s.aiToggle}>{isMobile ? '›' : (aiOpen ? '›' : '‹')}</span>
         </div>
-        {aiOpen && (
-          <div style={s.aiBody}>
+        <div style={{ ...s.aiBody, ...(isMobile ? { flex: 1, overflowY: 'auto' } : {}) }}>
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: 3, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 3, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 8, ...(isMobile ? { overflowX: 'auto', gap: 2, paddingBottom: 6 } : {}) }}>
               {['generate','edit','draft','analyze','ingest','auto'].map(tab => (
                 <button
                   key={tab}
@@ -1181,8 +1374,7 @@ export default function WikiPage({ onBack }) {
               </>
             )}
           </div>
-        )}
-        {aiOpen && (
+        {(aiOpen || isMobile) && (
           <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: 10, color: '#4a4540', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace" }}>Chimera Memory</div>
             <div style={{ fontSize: 10, color: '#86efac', lineHeight: 1.5 }}>AI memory store via REST API</div>
@@ -1202,6 +1394,34 @@ export default function WikiPage({ onBack }) {
           </div>
         )}
       </aside>
+
+      {/* Mobile AI float button — toggle sidebar */}
+      {isMobile && (
+        <button
+          onClick={() => setAiMobileOpen(o => !o)}
+          style={{
+            position: 'fixed',
+            bottom: 20,
+            right: 20,
+            zIndex: 300,
+            width: 52,
+            height: 52,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg,#00e5ff,#a855f7)',
+            color: '#000',
+            fontSize: 24,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 4px 20px rgba(0,229,255,0.3)',
+            border: 'none'
+          }}
+          aria-label="Toggle AI Writer"
+        >
+          🤖
+        </button>
+      )}
     </div>
   );
 }
@@ -1211,7 +1431,7 @@ const s = {
   layout: { display: 'flex', height: '100vh', background: '#0e0d0b', color: '#b0a898', fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif", overflow: 'hidden' },
 
   sidebar: { width: 240, minWidth: 240, background: '#0b0a09', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  sidebarHeader: { padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center' },
+  sidebarHeader: { padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 },
   logo: { fontSize: 16, fontWeight: 700, color: '#e8e2d8', letterSpacing: '-0.01em' },
   backBtn: { margin: '8px 12px 0', padding: '6px 10px', background: '#161410', color: '#7a7468', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 5, fontSize: 12, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' },
   searchBox: { padding: '10px 12px' },

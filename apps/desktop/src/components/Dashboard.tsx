@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { open } from "@tauri-apps/plugin-shell";
+import { invoke } from "@tauri-apps/api/core";
 
 interface Status {
   running: boolean;
@@ -13,6 +14,12 @@ export function Dashboard() {
   const [status, setStatus] = useState<Status | null>(null);
   const [loading, setLoading] = useState({ start: false, stop: false });
   const logsRef = useRef<HTMLDivElement>(null);
+
+  // Settings state
+  const [autoStart, setAutoStart] = useState(false);
+  const [desktopIcon, setDesktopIcon] = useState(false);
+  const [taskbarIcon, setTaskbarIcon] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState({ auto: false, desk: false, task: false });
 
   const apiBase = "http://localhost:";
   const supervisorPort = "9876";
@@ -37,6 +44,33 @@ export function Dashboard() {
       logsRef.current.scrollTop = logsRef.current.scrollHeight;
     }
   }, [status?.logs]);
+
+  // Load current settings on mount
+  useEffect(() => {
+    invoke<boolean>("get_autostart").then(setAutoStart).catch(() => {});
+    invoke<boolean>("has_desktop_shortcut").then(setDesktopIcon).catch(() => {});
+  }, []);
+
+  const toggleAutoStart = async () => {
+    setSettingsLoading(l => ({ ...l, auto: true }));
+    const next = !autoStart;
+    try {
+      await invoke("set_autostart", { enabled: next });
+      setAutoStart(next);
+    } catch (e) { console.error(e); }
+    setSettingsLoading(l => ({ ...l, auto: false }));
+  };
+
+  const toggleDesktopIcon = async () => {
+    setSettingsLoading(l => ({ ...l, desk: true }));
+    const next = !desktopIcon;
+    try {
+      if (next) await invoke("create_desktop_shortcut");
+      else await invoke("remove_desktop_shortcut");
+      setDesktopIcon(next);
+    } catch (e) { console.error(e); }
+    setSettingsLoading(l => ({ ...l, desk: false }));
+  };
 
   const startApp = async () => {
     setLoading(l => ({ ...l, start: true }));
@@ -166,6 +200,75 @@ export function Dashboard() {
           }}
         >
           {status?.logs || "No logs yet. Start the app to see output."}
+        </div>
+      </div>
+
+      {/* Settings */}
+      <div style={{
+        padding: "16px 20px",
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.06)",
+        background: "#0b0a09",
+      }}>
+        <div style={{ fontSize: 12, color: "#4a4540", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, marginBottom: 12 }}>
+          Settings
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Auto-start */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 13, color: "#b0a898" }}>Start on system boot</div>
+              <div style={{ fontSize: 11, color: "#4a4540" }}>Auto-launch Chimera when you log in</div>
+            </div>
+            <button
+              onClick={toggleAutoStart}
+              disabled={settingsLoading.auto}
+              style={{
+                width: 44, height: 24, borderRadius: 12,
+                background: autoStart ? "#00e5ff" : "#161410",
+                border: "1px solid rgba(255,255,255,0.1)",
+                position: "relative", cursor: "pointer", transition: "0.2s",
+                opacity: settingsLoading.auto ? 0.6 : 1,
+              }}
+            >
+              <span style={{
+                position: "absolute", top: 2, left: autoStart ? 22 : 2,
+                width: 18, height: 18, borderRadius: "50%", background: "#fff",
+                transition: "0.2s", display: "block"
+              }} />
+            </button>
+          </div>
+
+          {/* Desktop icon */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 13, color: "#b0a898" }}>Desktop icon</div>
+              <div style={{ fontSize: 11, color: "#4a4540" }}>Create a shortcut on your desktop</div>
+            </div>
+            <button
+              onClick={toggleDesktopIcon}
+              disabled={settingsLoading.desk}
+              style={{
+                width: 44, height: 24, borderRadius: 12,
+                background: desktopIcon ? "#00e5ff" : "#161410",
+                border: "1px solid rgba(255,255,255,0.1)",
+                position: "relative", cursor: "pointer", transition: "0.2s",
+                opacity: settingsLoading.desk ? 0.6 : 1,
+              }}
+            >
+              <span style={{
+                position: "absolute", top: 2, left: desktopIcon ? 22 : 2,
+                width: 18, height: 18, borderRadius: "50%", background: "#fff",
+                transition: "0.2s", display: "block"
+              }} />
+            </button>
+          </div>
+
+          {/* Taskbar pin note */}
+          <div style={{ fontSize: 11, color: "#4a4540", marginTop: 4 }}>
+            💡 To pin to taskbar: right-click the desktop shortcut → "Pin to taskbar"
+          </div>
         </div>
       </div>
     </div>

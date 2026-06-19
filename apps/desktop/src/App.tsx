@@ -5,7 +5,8 @@ import { Dashboard } from "./components/Dashboard";
 
 function App() {
   const [supervisorRunning, setSupervisorRunning] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [update, setUpdate] = useState<{ has: boolean; current: string; latest: string; url: string } | null>(null);
 
   const startSupervisor = async () => {
     setLoading(true);
@@ -31,7 +32,27 @@ function App() {
   };
 
   useEffect(() => {
-    invoke<boolean>("supervisor_status").then(setSupervisorRunning).catch(() => {});
+    // Auto-start QVAC backend on app launch (Rust side already spawns it,
+    // but we ensure the frontend reflects the state).
+    invoke<boolean>("supervisor_status")
+      .then((running) => {
+        setSupervisorRunning(running);
+        if (!running) {
+          // Fallback: try to start if Rust setup() missed it
+          startSupervisor();
+        }
+      })
+      .catch(() => setSupervisorRunning(false))
+      .finally(() => setLoading(false));
+
+    // Check for updates on startup
+    invoke<{ has_update: boolean; current_version: string; latest_version: string; download_url: string }>("check_for_updates")
+      .then((res) => {
+        if (res.has_update) {
+          setUpdate({ has: true, current: res.current_version, latest: res.latest_version, url: res.download_url });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   return (
@@ -43,6 +64,36 @@ function App() {
       color: "#b0a898",
       fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif",
     }}>
+      {update?.has && (
+        <div style={{
+          padding: "10px 24px",
+          background: "linear-gradient(90deg, #c9a96e22, #00e5ff22)",
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}>
+          <span style={{ fontSize: 13, color: "#e8e2d8" }}>
+            Update available: <strong>v{update.latest}</strong> (you have v{update.current})
+          </span>
+          <button
+            onClick={() => open(update.url)}
+            style={{
+              padding: "4px 12px",
+              borderRadius: 5,
+              border: "1px solid rgba(255,255,255,0.1)",
+              background: "#161410",
+              color: "#00e5ff",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Download →
+          </button>
+        </div>
+      )}
       <header style={{
         padding: "16px 24px",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
@@ -66,27 +117,9 @@ function App() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 12, color: supervisorRunning ? "#86efac" : "#7a7468" }}>
-            {supervisorRunning ? "● Supervisor running" : "○ Supervisor stopped"}
+            {supervisorRunning ? "● Inference running" : "○ Starting..."}
           </span>
-          {!supervisorRunning ? (
-            <button
-              onClick={startSupervisor}
-              disabled={loading}
-              style={{
-                padding: "6px 14px",
-                borderRadius: 6,
-                border: "none",
-                background: "#c9a96e",
-                color: "#0e0d0b",
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: loading ? "not-allowed" : "pointer",
-                opacity: loading ? 0.6 : 1,
-              }}
-            >
-              {loading ? "Starting..." : "Start Supervisor"}
-            </button>
-          ) : (
+          {supervisorRunning && (
             <button
               onClick={stopSupervisor}
               disabled={loading}
@@ -102,7 +135,7 @@ function App() {
                 opacity: loading ? 0.6 : 1,
               }}
             >
-              {loading ? "Stopping..." : "Stop Supervisor"}
+              {loading ? "Stopping..." : "Stop"}
             </button>
           )}
         </div>
@@ -120,14 +153,14 @@ function App() {
             gap: 16,
           }}>
             <h1 style={{ fontSize: 28, fontWeight: 700, color: "#e8e2d8", margin: 0 }}>
-              Local AI that earns when idle.
+              Starting Chimera...
             </h1>
             <p style={{ fontSize: 15, color: "#7a7468", maxWidth: 480, textAlign: "center", lineHeight: 1.7 }}>
-              Chimera runs a local AI node inside a Docker container.
-              Click <strong>Start Supervisor</strong> to begin.
+              The local AI inference node is starting in the background.
+              This may take a few seconds on first launch.
             </p>
             <p style={{ fontSize: 13, color: "#4a4540", maxWidth: 400, textAlign: "center" }}>
-              Requires Docker Desktop or Docker Engine. The supervisor will pull the <code>chimera:latest</code> image and start the container.
+              Node.js backend • No Docker required • Miners off by default
             </p>
             <button
               onClick={() => open("https://github.com/TerexitariusStomp/qvac-chimera")}

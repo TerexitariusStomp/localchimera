@@ -38,6 +38,14 @@ case "$OS" in
   Darwin)
     echo "Detected macOS. Running macOS installer..."
     curl -fsSL "https://raw.githubusercontent.com/$REPO/main/install-macos.sh" | bash
+    # Register LaunchAgent for auto-start
+    PLIST_SRC="$(dirname "$0")/com.chimera.desktop.plist"
+    if [ -f "$PLIST_SRC" ]; then
+      mkdir -p "$HOME/Library/LaunchAgents"
+      sed "s|\\$HOME|$HOME|g" "$PLIST_SRC" > "$HOME/Library/LaunchAgents/com.chimera.desktop.plist"
+      launchctl load "$HOME/Library/LaunchAgents/com.chimera.desktop.plist" 2>/dev/null || true
+      echo "✓ Auto-start registered (macOS LaunchAgent)"
+    fi
     ;;
 
   CYGWIN*|MINGW*|MSYS*)

@@ -1,8 +1,10 @@
 ---
+id: concepts/welcome-to-otterwiki
 title: Welcome to OtterWiki
 description: AI-generated wiki page
-date: 2026-06-18
 tags: []
+created: 2026-06-19
+modified: 2026-06-19
 ---
 
 # Welcome to OtterWiki

@@ -105,6 +105,12 @@ export class ChutesMiner {
     this.logger.info('Chutes provider started');
   }
 
+  async startMonitoring() {
+    if (this.isRunning) { this.logger.warn('Already running'); return; }
+    this.logger.info('Starting Chutes miner in monitoring mode...');
+    await this.start();
+  }
+
   async stop() {
     if (!this.isRunning) return;
     this.logger.info('Stopping Chutes provider...');

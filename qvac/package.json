@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
+    "start:auto": "bash start-auto.sh",
+    "start:auto:win": "start-auto.cmd",
     "init": "node src/init.js",
     "dev": "node --watch src/index.js",
     "test": "node --test",

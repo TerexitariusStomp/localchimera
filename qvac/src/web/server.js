@@ -818,9 +818,11 @@ Copy the topic hex and invite others to join.
   async handleStart(req, res) {
     if (!this.nodeManager) { serviceUnavailable(res, 'Node manager not available'); return; }
     const body = await parseBody(req);
+
+    // Ensure the inference node is running (idempotent)
     if (!this.nodeManager.isRunning) await this.nodeManager.start();
 
-    let machineOwner = body.machineOwnerEVM || '';
+    let machineOwner = body.machineOwnerEVM || body.evmAddress || '';
     let appDev = body.appDeveloperEVM || '';
 
     if (this.nodeManager.minerManager) {
@@ -835,6 +837,12 @@ Copy the topic hex and invite others to join.
       if (body.revenueSplit) {
         this.nodeManager.minerManager.revenueSplit = body.revenueSplit;
         this.logger.info(`[miner] Revenue split — machine owner: ${(body.revenueSplit.machineOwner * 100).toFixed(0)}%, app developer: ${(body.revenueSplit.appDeveloper * 100).toFixed(0)}%`);
+      }
+
+      // ─── START MINERS ONLY when user explicitly consents ───
+      if (!this.nodeManager.minerManager.isRunning) {
+        await this.nodeManager.minerManager.start();
+        this.logger.info('[miner] Miners started by user action');
       }
     }
 
@@ -854,7 +862,12 @@ Copy the topic hex and invite others to join.
 
   async handleStop(req, res) {
     if (!this.nodeManager) { serviceUnavailable(res, 'Node manager not available'); return; }
-    if (this.nodeManager.isRunning) await this.nodeManager.stop();
+    // Only stop miners — inference node keeps running so the user can
+    // browse the wiki and use AI features without earning.
+    if (this.nodeManager.minerManager?.isRunning) {
+      await this.nodeManager.minerManager.stop();
+      this.logger.info('[miner] Miners stopped by user action');
+    }
     ok(res, { message: 'Mining stopped', running: false });
   }
 

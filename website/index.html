@@ -119,12 +119,26 @@
 
     @media (max-width:768px){
       .how-grid{grid-template-columns:1fr}
-      nav{display:none}
       .hero h1{font-size:32px}
+      header .container{padding-right:16px}
+    }
+    .mobile-nav-btn{display:none;position:fixed;top:16px;right:16px;z-index:300;width:40px;height:40px;border-radius:10px;background:#161410;border:1px solid rgba(255,255,255,.1);color:#e8e2d8;font-size:20px;align-items:center;justify-content:center;cursor:pointer}
+    .mobile-nav-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:90}
+    .mobile-nav-overlay.open{display:block}
+    .mobile-drawer{position:fixed;top:0;right:0;bottom:0;width:220px;background:#0b0a0b;border-left:1px solid rgba(255,255,255,.08);z-index:200;display:flex;flex-direction:column;padding:64px 20px 20px;gap:16px;transform:translateX(100%);transition:transform .25s ease}
+    .mobile-drawer.open{transform:translateX(0)}
+    .mobile-drawer a{font-size:16px;color:#e8e2d8}
+    .mobile-drawer .nav-cta{background:rgba(0,229,255,.12);color:#00e5ff;padding:8px 18px;border-radius:8px;text-align:center;font-size:13px;font-weight:600}
+    @media (max-width:768px){
+      .mobile-nav-btn{display:flex}
+      #mainNav{display:none}
     }
   </style>
 </head>
 <body>
+
+<button class="mobile-nav-btn" id="mobileNavBtn" onclick="toggleMobileNav()" aria-label="Menu">☰</button>
+<div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="closeMobileNav()"></div>
 
 <header>
   <div class="container">
@@ -132,16 +146,24 @@
       <div class="logo-icon"><img src="chimeralogo-header.png" alt="Chimera"></div>
       Chimera
     </a>
-    <nav>
-      <a href="#features">Features</a>
+    <nav id="mainNav">
       <a href="demo-wiki.html">Wiki</a>
       <a href="earnings.html">Earnings</a>
-      <a href="#download">Download</a>
+      <a href="/inference/">Inference</a>
       <a href="https://github.com/TerexitariusStomp/qvac-chimera" target="_blank" rel="noopener">GitHub</a>
       <a href="#" class="nav-cta" id="navCTA" onclick="event.preventDefault(); autoDownload();">Get the app</a>
     </nav>
   </div>
 </header>
+
+<!-- Mobile drawer — outside header to escape z-index stacking context -->
+<nav id="mobileNav" class="mobile-drawer">
+  <a href="demo-wiki.html" onclick="closeMobileNav()">Wiki</a>
+  <a href="earnings.html" onclick="closeMobileNav()">Earnings</a>
+  <a href="/inference/" onclick="closeMobileNav()">Inference</a>
+  <a href="https://github.com/TerexitariusStomp/qvac-chimera" target="_blank" rel="noopener">GitHub</a>
+  <a href="#" class="nav-cta" onclick="event.preventDefault(); closeMobileNav(); autoDownload();">Get the app</a>
+</nav>
 
 <section class="hero">
   <div class="hero-banner"><img src="banner2.png" alt="Chimera"></div>
@@ -371,7 +393,11 @@
     const platform = navigator.platform;
     let os = 'unknown', icon = '↓', label = 'Download for your OS';
 
-    if (/Win/.test(platform) || /Windows/.test(ua)) {
+    if (/Android/.test(ua)) {
+      os = 'android'; icon = 'A'; label = 'Download for Android';
+    } else if (/iPhone|iPad|iPod/.test(ua)) {
+      os = 'ios'; icon = 'i'; label = 'Download for iOS';
+    } else if (/Win/.test(platform) || /Windows/.test(ua)) {
       os = 'windows'; icon = 'W'; label = 'Download for Windows';
     } else if (/Mac/.test(platform) || /Macintosh/.test(ua)) {
       os = 'macos'; icon = 'M'; label = 'Download for macOS';
@@ -394,17 +420,44 @@
   })();
 
   function pickAsset(assets, os) {
-    const names = assets.map(a => a.name.toLowerCase());
+    if (os === 'android') {
+      return assets.find(a => a.name.includes('Android') && a.name.endsWith('.apk'))
+        || assets.find(a => a.name.endsWith('.apk'));
+    }
+    if (os === 'ios') {
+      return assets.find(a => a.name.includes('iOS') && a.name.endsWith('.tar.gz'))
+        || assets.find(a => a.name.endsWith('.tar.gz') && a.name.toLowerCase().includes('ios'));
+    }
     if (os === 'windows') {
-      return assets.find(a => a.name.endsWith('.msi')) || assets.find(a => a.name.endsWith('.exe'));
+      return assets.find(a => a.name.includes('Windows') && (a.name.endsWith('.msi') || a.name.endsWith('.exe')))
+        || assets.find(a => a.name.endsWith('.msi')) || assets.find(a => a.name.endsWith('.exe'));
     }
     if (os === 'macos') {
-      return assets.find(a => a.name.endsWith('.dmg'));
+      return assets.find(a => a.name.includes('macOS') && a.name.endsWith('.dmg'))
+        || assets.find(a => a.name.endsWith('.dmg')) || assets.find(a => a.name.endsWith('.app.tar.gz'));
     }
     if (os === 'linux') {
-      return assets.find(a => a.name.endsWith('.deb')) || assets.find(a => a.name.endsWith('.AppImage'));
+      return assets.find(a => a.name.includes('Linux') && (a.name.endsWith('.deb') || a.name.endsWith('.rpm') || a.name.endsWith('.AppImage')))
+        || assets.find(a => a.name.endsWith('.deb')) || assets.find(a => a.name.endsWith('.AppImage')) || assets.find(a => a.name.endsWith('.rpm'));
     }
     return null;
+  }
+
+  function toggleMobileNav() {
+    const drawer = document.getElementById('mobileNav');
+    const ov = document.getElementById('mobileNavOverlay');
+    const isOpen = drawer.classList.contains('open');
+    if (isOpen) {
+      drawer.classList.remove('open');
+      ov.classList.remove('open');
+    } else {
+      drawer.classList.add('open');
+      ov.classList.add('open');
+    }
+  }
+  function closeMobileNav() {
+    document.getElementById('mobileNav').classList.remove('open');
+    document.getElementById('mobileNavOverlay').classList.remove('open');
   }
 
   async function autoDownload() {
@@ -420,12 +473,16 @@
       const data = await res.json();
       const asset = pickAsset(data.assets || [], os);
       if (asset && asset.browser_download_url) {
-        const a = document.createElement('a');
-        a.href = asset.browser_download_url;
-        a.download = asset.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        // GitHub asset URLs redirect to a CDN with expiring tokens.
+        // On mobile browsers this redirect chain causes "perpetual downloading"
+        // for generically-named files. With OS-identified names (Chimera-Android.apk)
+        // direct download usually works. For iOS we still open the release page
+        // since .tar.gz requires manual extraction.
+        if (os === 'ios') {
+          window.open(fallback, '_blank');
+        } else {
+          window.open(asset.browser_download_url, '_blank');
+        }
       } else {
         window.open(fallback, '_blank');
       }

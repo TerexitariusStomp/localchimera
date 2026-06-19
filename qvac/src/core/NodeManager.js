@@ -150,9 +150,12 @@ export class NodeManager {
     // Start embedding service (loads model on first use)
     await this.embeddingService.start();
 
-    // Start miner manager
-    await this.minerManager.start();
-    
+    // NOTE: Miners are initialized but NOT auto-started.
+    // The user must explicitly start them via the frontend
+    // (POST /api/start with their wallet address) after the node is running.
+    // this.minerManager.start() is called from handleStart in WebServer.
+    this.logger.info('Miners initialized but not started — waiting for user consent');
+
     // Start web server for dashboard API
     await this.webServer.start();
 

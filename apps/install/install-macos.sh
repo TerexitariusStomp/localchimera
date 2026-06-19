@@ -33,7 +33,8 @@ fi
 echo "Downloading..."
 curl -L -o /tmp/Chimera.dmg "$ASSET_URL"
 
-echo "Mounting DMG..."m -rf /tmp/Chimera-mount
+echo "Mounting DMG..."
+m -rf /tmp/Chimera-mount
 mkdir -p /tmp/Chimera-mount
 hdiutil attach /tmp/Chimera.dmg -mountpoint /tmp/Chimera-mount -nobrowse
 
@@ -43,14 +44,17 @@ cp -R /tmp/Chimera-mount/Chimera.app /Applications/
 hdiutil detach /tmp/Chimera-mount
 rm -f /tmp/Chimera.dmg
 
-# Check Docker
-echo "Checking Docker..."
-if ! command -v docker >/dev/null 2>&1; then
-  echo "WARNING: Docker not found. Chimera requires Docker to run the backend."
-  echo "Install Docker Desktop: https://docs.docker.com/desktop/install/mac-install/"
-fi
-
 echo ""
 echo "=== Installation complete ==="
+
+# Register LaunchAgent for auto-start
+PLIST_SRC="$(dirname "$0")/com.chimera.desktop.plist"
+if [ -f "$PLIST_SRC" ]; then
+  mkdir -p "$HOME/Library/LaunchAgents"
+  sed "s|\\$HOME|$HOME|g" "$PLIST_SRC" > "$HOME/Library/LaunchAgents/com.chimera.desktop.plist"
+  launchctl load "$HOME/Library/LaunchAgents/com.chimera.desktop.plist" 2>/dev/null || true
+  echo "✓ Auto-start registered (macOS LaunchAgent)"
+fi
+
 echo "Starting Chimera..."
 open /Applications/Chimera.app

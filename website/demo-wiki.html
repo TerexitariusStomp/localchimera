@@ -14,7 +14,7 @@
   .layout{display:flex;height:100vh;padding-top:30px}
 
   /* Sidebar */
-  .sidebar{width:240px;min-width:240px;background:#0b0a09;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;overflow:hidden}
+  .sidebar{width:240px;min-width:240px;background:#0b0a09;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;overflow:hidden;transition:transform .25s ease}
   .sidebar-header{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px}
   .logo-icon{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#00e5ff,#a855f7);color:#000;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800}
   .logo-text{font-size:16px;font-weight:700;color:#e8e2d8;letter-spacing:-.01em}
@@ -29,6 +29,11 @@
   .nav-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sidebar-footer{padding:10px 12px;border-top:1px solid rgba(255,255,255,.06)}
   .new-page-btn{width:100%;padding:7px 0;background:#161410;color:#7a7468;border:1px solid rgba(255,255,255,.07);border-radius:5px;font-size:12px;cursor:pointer;transition:.15s}
+
+  /* Mobile hamburger */
+  .mobile-menu-btn{display:none;position:fixed;top:34px;left:8px;z-index:250;width:36px;height:36px;border-radius:8px;background:#161410;border:1px solid rgba(255,255,255,.1);color:#e8e2d8;font-size:18px;align-items:center;justify-content:center;cursor:pointer}
+  .mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:90}
+  .ai-float-btn{display:flex;position:fixed;bottom:20px;right:20px;z-index:300;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#00e5ff,#a855f7);color:#000;font-size:24px;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 20px rgba(0,229,255,.3);border:none}
 
   /* Main */
   .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
@@ -91,6 +96,52 @@
   .memory-details summary{cursor:pointer;color:#4a4540;font-weight:600;font-size:10px}
   .memory-details .memory-help{padding:6px 0;display:flex;flex-direction:column;gap:4px;line-height:1.5}
   .memory-details .memory-help b{color:#b0a898}
+
+  /* Mobile responsiveness */
+  @media (max-width:768px){
+    body{overflow:auto;height:auto}
+    .layout{flex-direction:column;height:auto;padding-top:48px}
+    .mobile-menu-btn{display:flex}
+    .mobile-overlay{display:block;opacity:0;pointer-events:none;transition:opacity .2s}
+    .mobile-overlay.open{opacity:1;pointer-events:auto}
+    .sidebar{position:fixed;top:30px;left:0;bottom:0;z-index:100;width:260px;min-width:260px;transform:translateX(-100%);border-right:1px solid rgba(255,255,255,.1)}
+    .sidebar.open{transform:translateX(0)}
+    .main{min-height:100vh}
+    .toolbar{flex-wrap:wrap;gap:6px;padding:8px 10px}
+    .toolbar-group{flex-wrap:wrap}
+    .toolbar-btn{padding:4px 8px;font-size:10px}
+    .mode-btn{padding:4px 10px;font-size:11px}
+    .editor-pane{flex-direction:column}
+    .pane-left{width:100%;min-height:200px;border-right:none;border-bottom:1px solid rgba(255,255,255,.06);padding:12px 14px;font-size:13px}
+    .pane-right{flex-direction:column}
+    .preview{padding:14px 16px;font-size:13px}
+    .preview h1{font-size:22px}
+    .preview h2{font-size:16px}
+    .preview h3{font-size:14px}
+    .toc{width:100%;min-width:auto;border-left:none;border-top:1px solid rgba(255,255,255,.06);padding:12px 14px}
+    .ai-panel{position:fixed;top:30px;right:0;bottom:0;width:85%;max-width:360px;z-index:220;background:#0b0a09;border-left:1px solid rgba(255,255,255,.1);transform:translateX(100%);transition:transform .25s ease;display:flex;flex-direction:column}
+    .ai-panel.ai-open{transform:translateX(0)}
+    .ai-panel .ai-header{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;cursor:pointer;flex-shrink:0}
+    .ai-panel .ai-body{flex:1;overflow-y:auto;padding:12px 16px}
+    .ai-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:210}
+    .ai-overlay.open{display:block}
+    .ai-tabs{overflow-x:auto;gap:2px;padding-bottom:6px;flex-shrink:0}
+    .ai-tab{padding:4px 6px;font-size:9px}
+    .demo-banner{font-size:11px;padding:4px 10px;gap:6px}
+    .settings-btn{display:flex;position:fixed;bottom:84px;right:20px;z-index:300;width:44px;height:44px;border-radius:50%;background:#161410;border:1px solid rgba(255,255,255,.1);color:#b0a898;font-size:18px;align-items:center;justify-content:center;cursor:pointer}
+    .settings-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:350;align-items:center;justify-content:center;padding:20px}
+    .settings-panel.open{display:flex}
+    .settings-card{background:#0b0a0b;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:20px;width:100%;max-width:340px;max-height:80vh;overflow-y:auto}
+    .settings-title{font-size:16px;font-weight:700;color:#e8e2d8;margin-bottom:16px}
+    .settings-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+    .settings-label{font-size:13px;color:#b0a898}
+    .settings-desc{font-size:11px;color:#4a4540;margin-top:2px}
+    .settings-toggle{width:44px;height:24px;border-radius:12px;background:#161410;border:1px solid rgba(255,255,255,.1);position:relative;cursor:pointer;transition:.2s}
+    .settings-toggle.on{background:#00e5ff}
+    .settings-toggle::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+    .settings-toggle.on::after{left:22px}
+    .settings-close{margin-top:16px;width:100%;padding:8px 0;background:#161410;color:#b0a898;border:1px solid rgba(255,255,255,.07);border-radius:6px;font-size:13px;cursor:pointer}
+  }
 </style>
 </head>
 <body>
@@ -103,9 +154,12 @@
   <a href="https://github.com/TerexitariusStomp/qvac-chimera">Download the app →</a>
 </div>
 
+<button class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Open menu">☰</button>
+<div class="mobile-overlay" id="mobileOverlay" onclick="toggleSidebar()"></div>
+
 <div class="layout">
   <!-- Sidebar -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="logo-icon" style="background:none;overflow:hidden"><img src="chimeralogo-header.png" alt="Chimera" style="width:40px;height:40px;border-radius:10px;object-fit:cover"></div>
       <div class="logo-text" style="font-size:20px;font-weight:800">Chimera</div>
@@ -280,13 +334,16 @@ console.log("Hello, wiki!");</code></pre>
     </div>
   </main>
 
+  <!-- AI overlay -->
+  <div class="ai-overlay" id="aiOverlay" onclick="closeAiSidebar()"></div>
+
   <!-- AI Panel -->
-  <aside class="ai-panel">
-    <div class="ai-header">
+  <aside class="ai-panel" id="aiPanel">
+    <div class="ai-header" id="aiHeader">
       <span>🤖 AI Writer</span>
-      <span style="font-size:16px;color:#4a4540">›</span>
+      <span id="aiChevron" style="font-size:16px;color:#4a4540">›</span>
     </div>
-    <div class="ai-body">
+    <div class="ai-body" id="aiBody">
       <div class="ai-tabs">
         <span class="ai-tab active" onclick="switchTab(this,'gen')">Generate</span>
         <span class="ai-tab" onclick="switchTab(this,'edit')">Edit</span>
@@ -410,6 +467,124 @@ function switchTab(el, id) {
     document.getElementById('tab-'+k).style.display = k === id ? 'block' : 'none';
   });
 }
+
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('mobileOverlay');
+  const isOpen = sb.classList.contains('open');
+  if (isOpen) {
+    sb.classList.remove('open');
+    ov.classList.remove('open');
+  } else {
+    sb.classList.add('open');
+    ov.classList.add('open');
+  }
+}
+
+// Mobile AI sidebar open/close
+function openAiSidebar() {
+  document.getElementById('aiPanel').classList.add('ai-open');
+  document.getElementById('aiOverlay').classList.add('open');
+}
+function closeAiSidebar() {
+  document.getElementById('aiPanel').classList.remove('ai-open');
+  document.getElementById('aiOverlay').classList.remove('open');
+}
+
+// Desktop: keep panel visible; mobile: start closed
+(function() {
+  const panel = document.getElementById('aiPanel');
+  if (window.innerWidth <= 768) {
+    panel.classList.remove('ai-open');
+  }
+})();
+</script>
+
+<!-- AI float button — toggle right sidebar -->
+<button class="ai-float-btn" id="aiFloatBtn" onclick="var p=document.getElementById('aiPanel'); if(p.classList.contains('ai-open')){ closeAiSidebar(); }else{ openAiSidebar(); }">🤖</button>
+
+<!-- Mobile settings button -->
+<button class="settings-btn" id="settingsBtn" onclick="toggleSettings()" aria-label="Settings">⚙️</button>
+
+<!-- Mobile settings panel -->
+<div class="settings-panel" id="settingsPanel" onclick="if(event.target===this)toggleSettings()">
+  <div class="settings-card" onclick="event.stopPropagation()">
+    <div class="settings-title">Settings</div>
+
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">Start on device boot</div>
+        <div class="settings-desc">Auto-launch Chimera when your device turns on</div>
+      </div>
+      <div class="settings-toggle" id="toggleBoot" onclick="togglePref('boot')"></div>
+    </div>
+
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">Add to home screen</div>
+        <div class="settings-desc">Install as an app icon on your home screen</div>
+      </div>
+      <div class="settings-toggle" id="toggleHome" onclick="togglePref('home')"></div>
+    </div>
+
+    <div class="settings-row">
+      <div>
+        <div class="settings-label">Keep AI panel open</div>
+        <div class="settings-desc">Always show AI Writer and Memory on load</div>
+      </div>
+      <div class="settings-toggle" id="toggleAi" onclick="togglePref('ai')"></div>
+    </div>
+
+    <button class="settings-close" onclick="toggleSettings()">Close</button>
+  </div>
+</div>
+
+<script>
+// Settings persistence
+function getPref(key){ try{return localStorage.getItem('chimera_'+key)==='1'}catch(e){return false} }
+function setPref(key,val){ try{localStorage.setItem('chimera_'+key,val?'1':'0')}catch(e){} }
+
+function toggleSettings(){
+  document.getElementById('settingsPanel').classList.toggle('open');
+}
+
+function togglePref(key){
+  const el = document.getElementById(key==='boot'?'toggleBoot':key==='home'?'toggleHome':'toggleAi');
+  const now = !el.classList.contains('on');
+  el.classList.toggle('on', now);
+  setPref(key, now);
+
+  if(key==='home' && now){
+    // Prompt PWA install if available
+    if(window.deferredPrompt){
+      window.deferredPrompt.prompt();
+    } else {
+      alert('Tap your browser menu and choose "Add to Home Screen"');
+    }
+  }
+  if(key==='ai' && now){
+    document.getElementById('aiPanel').classList.remove('mobile-collapsed');
+    document.getElementById('aiChevron').textContent = '›';
+  }
+}
+
+// Initialize toggles from storage
+(function(){
+  if(getPref('boot')) document.getElementById('toggleBoot').classList.add('on');
+  if(getPref('home')) document.getElementById('toggleHome').classList.add('on');
+  if(getPref('ai')){ document.getElementById('toggleAi').classList.add('on'); }
+  else if(window.innerWidth<=768){
+    // Default: keep AI open unless user explicitly turned it off
+    var aiEl = document.getElementById('toggleAi');
+    if(!aiEl.classList.contains('on')){ aiEl.classList.add('on'); setPref('ai',true); }
+  }
+})();
+
+// Capture PWA install prompt
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  window.deferredPrompt = e;
+});
 </script>
 
 </body>

@@ -70,14 +70,19 @@ else
   chmod +x /usr/local/bin/chimera
 fi
 
-# Check Docker
-echo "Checking Docker..."
-if ! command -v docker >/dev/null 2>&1; then
-  echo "WARNING: Docker not found. Chimera requires Docker to run the backend."
-  echo "Install Docker: https://docs.docker.com/engine/install/"
-fi
-
 echo ""
 echo "=== Installation complete ==="
+
+# Register systemd user service for auto-start
+SERVICE_SRC="$SCRIPT_DIR/chimera.service"
+if [ -f "$SERVICE_SRC" ]; then
+  mkdir -p "$HOME/.config/systemd/user"
+  sed "s|\\${HOME}|$HOME|g" "$SERVICE_SRC" > "$HOME/.config/systemd/user/chimera.service"
+  systemctl --user daemon-reload
+  systemctl --user enable chimera.service
+  systemctl --user start chimera.service
+  echo "✓ Auto-start registered (systemd user service)"
+fi
+
 echo "Starting Chimera..."
 chimera || /usr/local/bin/chimera || echo "Run 'chimera' to start the app."
