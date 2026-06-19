@@ -17,7 +17,7 @@ oUQDQgAEJ9jdXMqmAORbNuWY2Q74wmtsZ++Bvf696PpYOZepHqWCFmTFZDzW+JYO
 fZf7vQid4otudHLFJBWkiazcayJz9g==
 -----END EC PRIVATE KEY-----`;
 
-const CONTRACT_HASH = 'b3f8b9643cc190448139525491b3196df072e30c703610261336bb97202b5e27';
+const CONTRACT_HASH = 'b922171c95bb26bb8c505b1089a15e8d1f8c54e4cde6a271cf228d559bb00d92';
 const JOB_ID = 'job:e39ac4daa9a8fe88d9f074cecfd537d18eb0fbf1196c1b4dd85749bcc50723e9:0';
 
 async function rpcCall(method, params) {
