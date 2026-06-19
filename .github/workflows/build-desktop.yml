@@ -207,13 +207,11 @@ jobs:
         run: |
           cd apps/mobile/android
           ./gradlew assembleDebug
-      - name: Upload APK to release
-        uses: softprops/action-gh-release@v2
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ needs.create-release.outputs.tag_name }}
-          files: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: chimera-android
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
   build-ios:
     needs: create-release
     runs-on: macos-latest
@@ -250,10 +248,29 @@ jobs:
         run: |
           cd apps/mobile/ios
           tar -czf Chimera-iOS.tar.gz -C .. Chimera-iOS
-      - name: Upload iOS to release
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chimera-ios
+          path: apps/mobile/ios/Chimera-iOS.tar.gz
+  upload-mobile-assets:
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chimera-android
+          path: mobile-assets
+      - name: Download iOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chimera-ios
+          path: mobile-assets
+      - name: Upload mobile assets to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.create-release.outputs.tag_name }}
-          files: apps/mobile/ios/Chimera-iOS.tar.gz
+          files: mobile-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

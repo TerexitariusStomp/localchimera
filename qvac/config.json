@@ -65,6 +65,11 @@
         "network": "solana",
         "walletAddress": "4R5d695FM5AiVjTkbadrjU4wr9ayK7ajeMdqgLd9muQA",
         "protocolAddress": "4R5d695FM5AiVjTkbadrjU4wr9ayK7ajeMdqgLd9muQA",
+        "nodeName": "Chimera-IDLE-Inference",
+        "model": "llama-3.2-1b-instruct",
+        "gpuAvailable": false,
+        "pollInterval": 30000,
+        "apiBase": "https://api.earnidle.com",
         "autoFundSweep": true
       }
     },

@@ -1,5 +1,13 @@
 import { Logger } from '../core/Logger.js';
 
+/**
+ * EarnidleMiner — IDLE Inference Network worker
+ *
+ * Polls api.earnidle.com for inference jobs, runs them via the QVAC
+ * inference layer (@qvac/sdk), and submits results for USDC payout.
+ *
+ * Payout wallet: Solana SPL token account (e.g. 4R5d...muQA)
+ */
 export class EarnidleMiner {
   constructor(config, inferenceLayer = null) {
     this.config = config;
@@ -10,147 +18,217 @@ export class EarnidleMiner {
     this.monitoringMode = false;
     this.walletAddress = config.walletAddress || null;
     this.network = config.network || 'solana';
-    this.registrationToken = null;
-    this.providerId = null;
+    this.apiBase = config.apiBase || 'https://api.earnidle.com';
+    this.model = config.model || 'llama-3.2-1b-instruct';
+    this.nodeName = config.nodeName || 'QVAC-Chimera-Node';
+    this.gpuAvailable = config.gpuAvailable || false;
+
+    // Runtime counters
+    this.jobsCompleted = 0;
+    this.jobsFailed = 0;
+    this.totalTokens = 0;
+    this.earningsUSDC = 0;
+    this._pollTimer = null;
   }
-  
+
   async initialize() {
-    this.logger.info('Initializing Earnidle miner...');
-    
-    // Validate wallet address if provided
+    this.logger.info('Initializing Earnidle (IDLE) inference worker...');
+
     if (this.walletAddress) {
       if (!this.validateWalletAddress(this.walletAddress)) {
-        this.logger.error('Invalid Solana wallet address');
-        throw new Error('Invalid wallet address format');
+        throw new Error('Invalid Solana wallet address format');
       }
-      this.logger.info(`Earnidle wallet configured: ${this.maskAddress(this.walletAddress)}`);
+      this.logger.info(`Payout wallet: ${this.maskAddress(this.walletAddress)}`);
     } else {
-      this.logger.warn('No wallet address configured - rewards cannot be received');
+      this.logger.warn('No wallet configured — payouts disabled');
     }
-    
-    // Earnidle integration would go here
-    // This would involve connecting to the IDLE Protocol
-    
-    this.logger.info('Earnidle miner initialized');
+
+    this.logger.info(`Model: ${this.model} | GPU: ${this.gpuAvailable}`);
+    this.logger.info('Earnidle worker initialized');
   }
-  
-  validateWalletAddress(address) {
-    // Solana addresses are base58 encoded, typically 32-44 characters
-    return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
+
+  validateWalletAddress(addr) {
+    return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
   }
-  
-  maskAddress(address) {
-    if (!address || address.length < 10) return '***';
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+
+  maskAddress(addr) {
+    if (!addr || addr.length < 10) return '***';
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   }
-  
+
   async start() {
-    if (this.isRunning) {
-      this.logger.warn('Earnidle miner already running');
-      return;
-    }
-
-    this.logger.info('Starting Earnidle miner...');
-
-    // Register with EarnIdle using the Solana multisig address
-    await this.registerWithEarnidle();
-
+    if (this.isRunning) { this.logger.warn('Already running'); return; }
+    this.logger.info('Starting IDLE inference worker...');
     this.isRunning = true;
-    this.logger.info('Earnidle miner started');
+    this._runLoop();
   }
 
-  async registerWithEarnidle() {
-    if (!this.walletAddress) {
-      this.logger.warn('No wallet address configured — skipping EarnIdle registration');
+  async startMonitoring() {
+    if (this.isRunning) { this.logger.warn('Already running'); return; }
+    this.logger.info('Starting IDLE worker in monitoring mode...');
+    this.isRunning = true;
+    this.monitoringMode = true;
+    this._runLoop();
+  }
+
+  async stop() {
+    if (!this.isRunning) return;
+    this.logger.info('Stopping IDLE worker...');
+    this.isRunning = false;
+    this.monitoringMode = false;
+    if (this._pollTimer) clearTimeout(this._pollTimer);
+    this._pollTimer = null;
+  }
+
+  // ─── Main polling loop ───
+
+  async _runLoop() {
+    while (this.isRunning) {
+      try {
+        await this._pollAndRun();
+      } catch (e) {
+        this.logger.error(`Polling error: ${e.message}`);
+      }
+      // IDLE recommends ~30s between polls
+      await this._sleep(this.config.pollInterval || 30000);
+    }
+  }
+
+  async _sleep(ms) {
+    return new Promise(resolve => { this._pollTimer = setTimeout(resolve, ms); });
+  }
+
+  // ─── Poll for job, execute, submit ───
+
+  async _pollAndRun() {
+    if (!this.walletAddress) return;
+
+    const pollUrl = `${this.apiBase}/api/inference/job?` +
+      `node_id=${encodeURIComponent(this.walletAddress)}&` +
+      `model=${encodeURIComponent(this.model)}`;
+
+    let job = null;
+    try {
+      const res = await fetch(pollUrl, { headers: { 'Accept': 'application/json' } });
+      if (res.status === 204 || res.status === 404) return; // no jobs
+      job = await res.json();
+    } catch (e) {
+      this.logger.debug(`No job available (${e.message})`);
       return;
     }
 
-    const apiBase = this.config.apiBase || 'https://api.earnidle.com';
-    const registerUrl = `${apiBase}/api/providers/register`;
+    if (!job || !job.id) return;
 
+    this.logger.info(`Job ${job.id.slice(0, 8)}… received | prompt: ${(job.prompt || '').slice(0, 60)}…`);
+
+    if (this.monitoringMode) {
+      this.logger.info('[monitoring] Would process job — skipping execution');
+      return;
+    }
+
+    // Run inference via QVAC SDK or inference layer
+    const result = await this._runInference(job);
+
+    // Submit result back to IDLE
+    await this._submitResult(job.id, result);
+  }
+
+  async _runInference(job) {
+    const prompt = job.prompt || job.messages?.map(m => m.content).join('\n') || '';
+    const maxTokens = job.max_tokens || 256;
+    const temperature = job.temperature || 0.7;
+
+    try {
+      if (this.inferenceLayer) {
+        this.logger.info('Routing through QVAC inference layer');
+        const out = await this.inferenceLayer.handleInferenceRequest({
+          model: this.model,
+          prompt,
+          maxTokens,
+          temperature,
+          stream: false
+        }, this.name);
+        return {
+          success: out.success,
+          text: out.text || out.result || '',
+          tokens: out.tokens || maxTokens
+        };
+      }
+
+      // Fallback: direct QVAC SDK call if inferenceLayer unavailable
+      this.logger.info('Using direct QVAC SDK inference');
+      const qvac = await import('@qvac/sdk');
+      const modelId = await qvac.loadModel({
+        modelSrc: qvac.LLAMA_3_2_1B_INST_Q4_0,
+        modelType: 'text',
+        modelConfig: { device: 'cpu' }
+      });
+      const out = await qvac.complete({
+        modelId,
+        prompt,
+        maxTokens,
+        temperature,
+        stream: false
+      });
+      return { success: true, text: out.text || '', tokens: out.tokens || maxTokens };
+    } catch (e) {
+      this.logger.error(`Inference failed: ${e.message}`);
+      return { success: false, error: e.message, text: '', tokens: 0 };
+    }
+  }
+
+  async _submitResult(jobId, result) {
+    const submitUrl = `${this.apiBase}/api/inference/result`;
     const payload = {
-      walletAddress: this.walletAddress,
-      network: this.network,
-      protocol: 'qvac-chimera',
-      version: '1.0.0',
-      capabilities: ['inference', 'embedding'],
-      multisigType: 'spl-multisig'
+      node_id: this.walletAddress,
+      job_id: jobId,
+      model: this.model,
+      output: result.text || '',
+      tokens: result.tokens || 0,
+      success: result.success
     };
 
     try {
-      const response = await fetch(registerUrl, {
+      const res = await fetch(submitUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        this.registrationToken = data.token || null;
-        this.providerId = data.providerId || null;
-        this.logger.info(`EarnIdle registration successful: providerId=${this.maskAddress(this.providerId || 'unknown')}`);
+      if (res.ok) {
+        const data = await res.json();
+        this.jobsCompleted++;
+        this.totalTokens += result.tokens || 0;
+        this.earningsUSDC += data.usdcEarned || 0;
+        this.logger.info(`Result submitted | earned ${data.usdcEarned || 0} USDC | total: ${this.earningsUSDC.toFixed(4)}`);
       } else {
-        const text = await response.text();
-        this.logger.warn(`EarnIdle registration returned ${response.status}: ${text}`);
+        this.jobsFailed++;
+        const text = await res.text();
+        this.logger.warn(`Submit failed ${res.status}: ${text}`);
       }
     } catch (e) {
-      this.logger.warn(`EarnIdle registration failed: ${e.message}`);
+      this.jobsFailed++;
+      this.logger.error(`Submit error: ${e.message}`);
     }
   }
-  
-  async startMonitoring() {
-    if (this.isRunning && this.monitoringMode) {
-      this.logger.warn('Earnidle miner already in monitoring mode');
-      return;
-    }
-    
-    this.logger.info('Starting Earnidle miner in monitoring mode...');
-    
-    // Start earnidle agent in monitoring mode
-    
-    this.isRunning = true;
-    this.monitoringMode = true;
-    this.logger.info('Earnidle miner monitoring mode started');
-  }
-  
-  async stop() {
-    if (!this.isRunning) {
-      return;
-    }
-    
-    this.logger.info('Stopping Earnidle miner...');
-    
-    // Stop earnidle agent
-    
-    this.isRunning = false;
-    this.monitoringMode = false;
-    this.logger.info('Earnidle miner stopped');
-  }
-  
-  async onInferenceTask(task) {
-    this.logger.info(`Inference task detected: ${task.id || 'unknown'}`);
-    
-    if (this.inferenceLayer) {
-      this.logger.info('Routing task through centralized inference router');
-      const result = await this.inferenceLayer.handleInferenceRequest(task, this.name);
-      this.logger.info(`Inference result: ${result.success ? 'success' : 'failed'}`);
-      return result;
-    } else {
-      this.logger.warn('No inference router available - task not processed');
-      return { success: false, error: 'No inference router available' };
-    }
-  }
-  
+
+  // ─── Status ───
+
   getStatus() {
     return {
       running: this.isRunning,
       monitoringMode: this.monitoringMode,
       name: this.name,
+      nodeName: this.nodeName,
       walletConfigured: !!this.walletAddress,
       walletAddress: this.maskAddress(this.walletAddress),
       network: this.network,
-      registered: !!this.registrationToken,
-      providerId: this.maskAddress(this.providerId)
+      model: this.model,
+      gpuAvailable: this.gpuAvailable,
+      jobsCompleted: this.jobsCompleted,
+      jobsFailed: this.jobsFailed,
+      totalTokens: this.totalTokens,
+      earningsUSDC: this.earningsUSDC
     };
   }
 }
