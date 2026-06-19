@@ -523,7 +523,8 @@ export default function WikiPage({ onBack }) {
       }
     } catch (e) {
       console.error(e);
-      setSaveStatus('Rewrite failed');
+      setBackendError('AI backend not reachable. Run the desktop app or start a Chimera node.');
+      setSaveStatus('Backend unreachable');
     } finally {
       setAiLoading(false);
     }
@@ -545,6 +546,22 @@ export default function WikiPage({ onBack }) {
       setShowInline(false);
     }
   };
+
+  const [backendError, setBackendError] = useState('');
+
+  const checkBackend = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/ai-status`, { method: 'GET' });
+      if (!res.ok) throw new Error('Not reachable');
+      setBackendError('');
+    } catch (e) {
+      setBackendError('AI backend not reachable. Run the desktop app or start a Chimera node.');
+    }
+  };
+
+  useEffect(() => {
+    checkBackend();
+  }, []);
 
   const aiAction = async (instruction, type = 'replace') => {
     const selected = editorText.slice(selStart, selEnd);
@@ -583,11 +600,12 @@ export default function WikiPage({ onBack }) {
         }
         setShowInline(false);
       } else {
-        setSaveStatus('Failed');
+        setSaveStatus('AI generation failed');
       }
     } catch (e) {
       console.error(e);
-      setSaveStatus('Failed');
+      setBackendError('AI backend not reachable. Run the desktop app or start a Chimera node.');
+      setSaveStatus('Backend unreachable');
     } finally {
       setAiLoading(false);
     }
@@ -626,7 +644,8 @@ export default function WikiPage({ onBack }) {
       }
     } catch (e) {
       console.error(e);
-      setSaveStatus('Failed');
+      setBackendError('AI backend not reachable. Run the desktop app or start a Chimera node.');
+      setSaveStatus('Backend unreachable');
     } finally {
       setAiLoading(false);
     }
@@ -748,6 +767,17 @@ export default function WikiPage({ onBack }) {
         }}>
           <span>Update v{appUpdate.latest} available</span>
           <a href={appUpdate.url} target="_blank" rel="noopener" style={{ color: '#00e5ff', fontWeight: 600 }}>Download →</a>
+        </div>
+      )}
+
+      {/* Backend error banner */}
+      {backendError && (
+        <div style={{
+          position: 'fixed', top: appUpdate ? 38 : 0, left: 0, right: 0, zIndex: 399,
+          padding: '10px 14px', background: '#7f1d1d', color: '#fca5a5',
+          borderBottom: '1px solid #991b1b', fontSize: 13, textAlign: 'center'
+        }}>
+          {backendError}
         </div>
       )}
 
