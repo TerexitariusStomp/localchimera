@@ -17,11 +17,13 @@
     }
   },
   "android": {
+    "path": "../../apps/mobile/android",
     "buildOptions": {
       "releaseType": "AAB"
     }
   },
   "ios": {
+    "path": "../../apps/mobile/ios",
     "contentInset": "always"
   }
 }
