@@ -4,7 +4,7 @@
     "slug": "chimera-mobile",
     "version": "1.0.22",
     "orientation": "portrait",
-    "icon": "../mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+    "icon": "./assets/splash.png",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash.png",
@@ -21,7 +21,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "../mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+        "foregroundImage": "./assets/splash.png",
         "backgroundColor": "#0a0a14"
       },
       "package": "io.chimera.mobile",
