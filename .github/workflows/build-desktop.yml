@@ -294,9 +294,10 @@ jobs:
         run: |
           cd apps/mobile-expo
           npx expo prebuild --platform android --clean
-      - name: Set Gradle Java home and downgrade Compose compiler
+      - name: Set Gradle Java home, heap, and downgrade Compose compiler
         run: |
           echo "org.gradle.java.home=$JAVA_HOME" >> apps/mobile-expo/android/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError" >> apps/mobile-expo/android/gradle.properties
           echo "=== Patching Compose compiler 1.5.15 -> 1.5.14 ==="
           find apps/mobile-expo/node_modules/expo-modules-core -type f \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "*.toml" -o -name "*.properties" \) -exec sed -i 's/1\.5\.15/1.5.14/g' {} + 2>/dev/null || true
           find apps/mobile-expo/android -type f \( -name "*.gradle" -o -name "*.gradle.kts" -o -name "*.toml" \) -exec sed -i 's/1\.5\.15/1.5.14/g' {} + 2>/dev/null || true
