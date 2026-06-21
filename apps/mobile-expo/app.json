@@ -28,7 +28,6 @@
       "versionCode": 10022
     },
     "plugins": [
-      "@qvac/sdk",
       [
         "expo-build-properties",
         {
