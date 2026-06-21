@@ -1,9 +1,21 @@
 name: Test Build
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - run: echo "hello"
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install qvac deps
+        run: cd qvac && npm install
+      - name: Run test suite
+        run: cd qvac && node --test test/router.test.js test/orchestrator.test.js test/payout.test.js test/payout-http.test.js

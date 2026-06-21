@@ -79,7 +79,7 @@ export class NodeManager {
     await this.minerManager.initialize();
     
     // Initialize web server for dashboard API
-    this.webServer = new WebServer(this.config.web || {}, this);
+    this.webServer = new WebServer(this.config, this);
     await this.webServer.initialize();
 
     // Initialize monthly payout distributor

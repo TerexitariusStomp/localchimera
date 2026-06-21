@@ -7,6 +7,8 @@
  * For now it produces a distribution manifest that can be executed.
  */
 
+import { promises as fs } from 'fs';
+import path from 'path';
 import { PayoutRouter } from './PayoutRouter.js';
 import { Logger } from '../core/Logger.js';
 
@@ -62,30 +64,23 @@ export class MonthlyDistributor {
       }
       logger.info(`[monthly] Distribution ${targetYear}-${String(targetMonth).padStart(2, '0')} — status: calculated, denial window: 168 hours (7 days)`);
 
-      // 3. Write execution plan for transparency
+      // 3. Write transparency plan file — aggregate per wallet from manifest
       const byWallet = {};
       for (const d of manifest.distributions) {
         byWallet[d.developerEVM] = (byWallet[d.developerEVM] || 0) + d.devAmount;
         byWallet[d.machineOwnerEVM] = (byWallet[d.machineOwnerEVM] || 0) + d.userAmount;
       }
-      const distributionPlan = Object.entries(byWallet)
+      const recipients = Object.entries(byWallet)
         .map(([address, amount]) => ({ address, amount: parseFloat(amount.toFixed(6)) }))
         .filter(x => x.amount > 0);
 
-      const { promises: fs } = await import('fs');
-      const path = await import('path');
-      const dir = path.default.join(process.cwd(), 'data', 'payouts');
+      const dir = path.join(process.cwd(), 'data', 'payouts');
       await fs.mkdir(dir, { recursive: true });
-      const file = path.default.join(dir, `distribution-${targetYear}-${String(targetMonth).padStart(2, '0')}.json`);
+      const file = path.join(dir, `distribution-${targetYear}-${String(targetMonth).padStart(2, '0')}.json`);
       await fs.writeFile(file, JSON.stringify({
-        year: targetYear,
-        month: targetMonth,
-        generatedAt: Date.now(),
-        denialWindowHours: 168,
-        status: 'calculated',
-        totalRevenue: manifest.totalRevenue,
-        totalRecipients: distributionPlan.length,
-        recipients: distributionPlan
+        year: targetYear, month: targetMonth,
+        generatedAt: Date.now(), denialWindowHours: 168, status: 'calculated',
+        totalRevenue: manifest.totalRevenue, totalRecipients: recipients.length, recipients
       }, null, 2), 'utf-8');
       logger.info(`[monthly] Distribution plan saved to ${file}`);
 

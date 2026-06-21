@@ -6,7 +6,21 @@ on:
 permissions:
   contents: write
 jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Install qvac deps
+        run: cd qvac && npm install
+      - name: Run test suite
+        run: cd qvac && node --test test/router.test.js test/orchestrator.test.js test/payout.test.js test/payout-http.test.js
+
   build-linux:
+    needs: test
     runs-on: ubuntu-22.04
     env:
       CARGO_NET_RETRY: 10
@@ -42,6 +56,7 @@ jobs:
           name: linux-build
           path: apps/desktop/src-tauri/target/release/bundle
   build-windows:
+    needs: test
     runs-on: windows-latest
     env:
       CARGO_NET_RETRY: 10
@@ -97,6 +112,7 @@ jobs:
           name: windows-build
           path: apps/desktop/src-tauri/target/release/bundle
   build-macos:
+    needs: test
     runs-on: macos-latest
     env:
       CARGO_NET_RETRY: 10

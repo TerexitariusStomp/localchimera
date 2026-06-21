@@ -76,6 +76,32 @@ jobs:
             body += '---\n';
             body += 'See [docs/UPSTREAM.md](docs/UPSTREAM.md) for update instructions.\n';
 
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'upstream',
+              state: 'open',
+            });
+
+            if (existing.data.length > 0) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body: existing.data[0].body + '\n\n' + body,
+              });
+              console.log(`Updated existing issue #${existing.data[0].number}`);
+            } else {
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['upstream'],
+              });
+              console.log(`Created issue #${issue.data.number}`);
+            }
+
   check-github-upstreams:
     runs-on: ubuntu-22.04
     steps:

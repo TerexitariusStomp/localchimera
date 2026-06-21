@@ -67,6 +67,7 @@ export const ROUTES = [
   ['POST', '/api/payout/mark-distributed', 'handlePayoutMarkDistributed'],
   ['POST', '/api/payout/deny',              'handlePayoutDeny'],
   ['POST', '/api/payout/confirm',            'handlePayoutConfirm'],
+  ['POST', '/api/payout/execute',            'handlePayoutExecute'],
   ['GET',  '/api/payout/stats',            'handlePayoutStats'],
 ];
 

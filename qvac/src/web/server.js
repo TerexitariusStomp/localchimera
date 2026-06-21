@@ -850,8 +850,19 @@ Copy the topic hex and invite others to join.
     }
 
     if (this.nodeManager.minerManager) {
-      this.nodeManager.minerManager.machineOwnerEVM = machineOwner;
+      this.nodeManager.minerManager.evmAddress = machineOwner;
       this.logger.info(`[miner] Machine owner EVM: ${machineOwner}`);
+
+      // Propagate to already-constructed miners so they start with the correct address
+      const miners = this.nodeManager.minerManager.miners;
+      for (const name of ['cortensor', 'fortytwo']) {
+        const m = miners.get(name);
+        if (m) m.walletAddress = machineOwner;
+      }
+      for (const name of ['chutes', 'routstr']) {
+        const m = miners.get(name);
+        if (m) m.evmAddress = machineOwner;
+      }
 
       // Persist to config.json so the address survives restarts
       try {
@@ -1029,6 +1040,15 @@ Copy the topic hex and invite others to join.
     const body = await parseBody(req);
     const { year, month, txHash } = body;
     const result = await this.payoutRouter.confirmDistribution(year, month, txHash);
+    if (result.success) ok(res, result);
+    else badRequest(res, result.error);
+  }
+
+  async handlePayoutExecute(req, res) {
+    const body = await parseBody(req);
+    const year = parseInt(body.year || new Date().getUTCFullYear(), 10);
+    const month = parseInt(body.month || new Date().getUTCMonth() + 1, 10);
+    const result = await this.payoutRouter.executeDistribution(year, month);
     if (result.success) ok(res, result);
     else badRequest(res, result.error);
   }

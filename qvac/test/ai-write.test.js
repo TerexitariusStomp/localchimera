@@ -81,6 +81,7 @@ describe('WebServer handleAIWrite', () => {
   });
 
   after(async () => {
+    server.orchestrator.stop();
     if (httpServer) {
       httpServer.closeAllConnections?.();
       await new Promise((resolve) => httpServer.close(resolve));
@@ -130,6 +131,7 @@ describe('WebServer handleAIWrite', () => {
     });
 
     assert.equal(res.status, 503);
+    bareServer.orchestrator.stop();
     bareHttp.closeAllConnections?.();
     bareHttp.close();
   });
@@ -205,6 +207,7 @@ describe('AI Write Options', () => {
   });
 
   after(async () => {
+    server.orchestrator.stop();
     if (httpServer) {
       httpServer.closeAllConnections?.();
       await new Promise((resolve) => httpServer.close(resolve));
