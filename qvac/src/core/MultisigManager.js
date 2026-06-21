@@ -15,7 +15,7 @@ export class MultisigManager {
     this.pendingSweeps = new Map();
     this.machineOwnerAddress = config.machineOwnerAddress || null;
     this.revenueSplit = config.revenueSplit || { machineOwner: 0.70, appDeveloper: 0.30 };
-    this.evmMultisigAddress = config.evmMultisigAddress || null;
+    this.evmMultisigAddress = config.evmCollectionAddress || config.evmMultisigAddress || null;
   }
 
   async initialize() {
@@ -129,7 +129,7 @@ export class MultisigManager {
 
     setTimeout(() => {
       this.executeSweep(sweepId);
-    }, 2 * 24 * 60 * 60 * 1000);
+    }, 2 * 24 * 60 * 60 * 1000).unref();
 
     return sweepId;
   }
@@ -173,7 +173,7 @@ export class MultisigManager {
 
     setTimeout(() => {
       this.executeSweep(sweepId);
-    }, 2 * 24 * 60 * 60 * 1000);
+    }, 2 * 24 * 60 * 60 * 1000).unref();
 
     return sweepId;
   }

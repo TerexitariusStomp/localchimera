@@ -55,6 +55,7 @@ export class WalletManager {
 
     // Basic validation based on network type
     switch (network) {
+      case 'arbitrum':
       case 'arbitrum-testnet':
         // EVM address validation (0x + 40 hex characters)
         return /^0x[a-fA-F0-9]{40}$/.test(address);
@@ -97,11 +98,6 @@ export class WalletManager {
     }
 
     this.logger.info(`Connecting ${minerName} wallet to ${wallet.network}...`);
-    
-    // In a real implementation, this would establish actual connections
-    // For now, we simulate the connection
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
     wallet.connected = true;
     this.logger.info(`${minerName} wallet connected`);
   }
