@@ -72,7 +72,7 @@ jobs:
       - name: Copy QVAC to Tauri resources
         run: |
           mkdir -p apps/desktop/src-tauri/resources
-          cp -r qvac apps/desktop/src-tauri/resources/qvac
+          rsync -av --exclude='node_modules' --exclude='.git' --exclude='target' qvac/ apps/desktop/src-tauri/resources/qvac/
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
         env:
@@ -111,7 +111,7 @@ jobs:
       - name: Copy QVAC to Tauri resources
         run: |
           mkdir -p apps/desktop/src-tauri/resources
-          cp -r qvac apps/desktop/src-tauri/resources/qvac
+          rsync -av --exclude='node_modules' --exclude='.git' --exclude='target' qvac/ apps/desktop/src-tauri/resources/qvac/
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
         env:
@@ -152,7 +152,7 @@ jobs:
       - name: Copy QVAC to Tauri resources
         run: |
           mkdir -p apps/desktop/src-tauri/resources
-          cp -r qvac apps/desktop/src-tauri/resources/qvac
+          rsync -av --exclude='node_modules' --exclude='.git' --exclude='target' qvac/ apps/desktop/src-tauri/resources/qvac/
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
         env:
@@ -278,11 +278,10 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'gradle'
-      - name: Verify JDK and set Gradle Java home
+      - name: Verify JDK
         run: |
           java -version
           echo "JAVA_HOME=$JAVA_HOME"
-          echo "org.gradle.java.home=$JAVA_HOME" >> apps/mobile-expo/android/gradle.properties
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -305,11 +304,13 @@ jobs:
         run: |
           cd apps/mobile-expo
           npx expo prebuild --platform android --clean
+      - name: Set Gradle Java home
+        run: |
+          echo "org.gradle.java.home=$JAVA_HOME" >> apps/mobile-expo/android/gradle.properties
       - name: Build Expo APK
         run: |
           cd apps/mobile-expo/android
           chmod +x ./gradlew
-          ./gradlew --version
           ./gradlew --version
           ./gradlew assembleRelease
       - name: Verify Expo APK exists

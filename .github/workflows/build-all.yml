@@ -21,7 +21,7 @@ jobs:
         run: |
           cd apps/desktop/supervisor && go build -o supervisor main.go
           mkdir -p ../src-tauri/bin && cp supervisor ../src-tauri/bin/supervisor-x86_64-unknown-linux-gnu
-          cd ../../qvac/frontend && npm install && npm run build
+          cd ../../../qvac/frontend && npm install && npm run build
           cd ../../apps/desktop && npm install && npm run build
       - name: Tauri build
         uses: tauri-apps/tauri-action@v0
@@ -45,7 +45,7 @@ jobs:
         run: |
           cd apps/desktop/supervisor; go build -o supervisor.exe main.go
           mkdir -p ../src-tauri/bin; copy supervisor.exe ../src-tauri/bin/supervisor-x86_64-pc-windows-msvc.exe
-          cd ../../qvac/frontend; npm install; npm run build
+          cd ../../../qvac/frontend; npm install; npm run build
           cd ../../apps/desktop; npm install; npm run build
       - name: Tauri build
         uses: tauri-apps/tauri-action@v0
