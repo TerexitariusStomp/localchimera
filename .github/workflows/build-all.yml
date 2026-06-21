@@ -52,13 +52,10 @@ jobs:
           cd ../../../qvac/frontend; npm install; npm run build
           cd ../../apps/desktop; npm install; npm run build
       - name: Copy QVAC to Tauri resources
-        shell: pwsh
+        shell: cmd
         run: |
-          $ErrorActionPreference = 'Continue'
-          robocopy qvac apps/desktop/src-tauri/qvac /E /XD node_modules .git target /R:0 /W:0
-          $rc = $LASTEXITCODE
-          if ($rc -ge 8) { exit 1 }
-          exit 0
+          robocopy qvac apps\desktop\src-tauri\qvac /E /XD node_modules .git target /R:0 /W:0
+          if %ERRORLEVEL% GEQ 8 exit /b 1
       - name: Tauri build
         uses: tauri-apps/tauri-action@v0
         with:
