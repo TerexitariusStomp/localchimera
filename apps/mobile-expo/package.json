@@ -1,6 +1,6 @@
 {
   "name": "chimera-mobile-expo",
-  "version": "1.0.21",
+  "version": "1.0.22",
   "main": "expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
@@ -17,7 +17,8 @@
     "react-native-bare-kit": "^2.0.0",
     "@qvac/sdk": "^0.13.2",
     "expo-file-system": "~18.0.0",
-    "expo-keep-awake": "~14.0.0"
+    "expo-keep-awake": "~14.0.0",
+    "react-native-webview": "13.12.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
