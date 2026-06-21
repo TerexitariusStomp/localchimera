@@ -1,13 +1,13 @@
+import { createHash } from 'crypto';
 import { Logger } from '../core/Logger.js';
 import pkg from 'casper-js-sdk';
 
 const sdk = pkg;
 const { PrivateKey, PublicKey, KeyAlgorithm, CLValue, Args, ContractHash, StoredContractByHash, ExecutableDeployItem, DeployHeader, Deploy, RpcClient, HttpHandler } = sdk;
 
-const CHAIN_NAME = 'casper-test';
-const DEFAULT_RPC_URL = 'https://rpc.testnet.casper.network/rpc';
+const DEFAULT_RPC_URL = 'https://rpc.mainnet.casper.network/rpc';
 
-const CONTRACTS = {
+const TESTNET_CONTRACTS = {
   escrowVault: '161f9eb54e9bcdc7345084285243ba718abc4ac5601132e8d069c0df6157fb74',
   computeRegistry: 'f8c969bfa7553a23deab0f77fb43210d4810156a977e0cc2695b23182e5b41d0',
   orderBook: 'cecfc698508213f63e7e7fe6f0729b090af23c87c7e444db7fc90be73736e399',
@@ -27,8 +27,7 @@ const STATE = {
   DISPUTE_PROVIDER_WON: 9,
 };
 
-async function stringToHash(str) {
-  const { createHash } = await import('crypto');
+function stringToHash(str) {
   return createHash('sha256').update(str).digest('hex');
 }
 
@@ -88,6 +87,14 @@ export class CasperEscrowBridge {
     return this.config.rpcUrl || process.env.CASPER_RPC_URL || DEFAULT_RPC_URL;
   }
 
+  get chainName() {
+    return this.config.chainName || process.env.CASPER_CHAIN_NAME || 'casper';
+  }
+
+  get contracts() {
+    return this.config.contracts || TESTNET_CONTRACTS;
+  }
+
   async initialize() {
     this.logger.info('Initializing Casper escrow bridge...');
     this.logger.info(`Casper RPC: ${this.rpcUrl}`);
@@ -123,7 +130,7 @@ export class CasperEscrowBridge {
       const balance = await this.getAccountBalance(this.providerAccountHash);
       this.logger.info(`Provider balance: ${balance}`);
       if (balance === '0 CSPR' || balance.startsWith('Error')) {
-        this.logger.warn('Provider account has no balance. Fund it with testnet CSPR before accepting jobs.');
+        this.logger.warn('Provider account has no balance. Fund it with CSPR before accepting jobs.');
       }
     } catch (e) {
       this.logger.warn(`Balance check failed: ${e.message}`);
@@ -171,7 +178,7 @@ export class CasperEscrowBridge {
 
     // Poll immediately, then every 15 seconds
     await this.pollJobs();
-    this.pollInterval = setInterval(() => this.pollJobs(), 15000);
+    this.pollInterval = setInterval(() => this.pollJobs(), 15000).unref();
   }
 
   async startMonitoring() {
@@ -193,7 +200,7 @@ export class CasperEscrowBridge {
 
     try {
       // Get pending jobs list (named key is 'pending_jobs')
-      const pending = await getDictionaryItem(this.rpcUrl, CONTRACTS.escrowVault, 'pending_jobs', 'list');
+      const pending = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'pending_jobs', 'list');
       if (!pending || !Array.isArray(pending) || pending.length === 0) return;
 
       this.logger.info(`Found ${pending.length} pending job(s)`);
@@ -210,10 +217,10 @@ export class CasperEscrowBridge {
   async handleJob(jobId) {
     try {
       // Read job state directly from dictionary (named keys: jobs_dict, pending_jobs, etc.)
-      const stateVal = await getDictionaryItem(this.rpcUrl, CONTRACTS.escrowVault, 'jobs_dict', `${jobId}:state`);
-      const providerVal = await getDictionaryItem(this.rpcUrl, CONTRACTS.escrowVault, 'jobs_dict', `${jobId}:provider`);
-      const consumerVal = await getDictionaryItem(this.rpcUrl, CONTRACTS.escrowVault, 'jobs_dict', `${jobId}:consumer`);
-      const amountVal = await getDictionaryItem(this.rpcUrl, CONTRACTS.escrowVault, 'jobs_dict', `${jobId}:amount`);
+      const stateVal = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'jobs_dict', `${jobId}:state`);
+      const providerVal = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'jobs_dict', `${jobId}:provider`);
+      const consumerVal = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'jobs_dict', `${jobId}:consumer`);
+      const amountVal = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'jobs_dict', `${jobId}:amount`);
 
       if (stateVal === null || providerVal === null) {
         this.logger.warn(`Could not fetch job details for ${jobId}`);
@@ -249,7 +256,7 @@ export class CasperEscrowBridge {
       await this.providerAck(jobId);
 
       // Get the request hash (order_id/prompt)
-      const requestHash = await getDictionaryItem(this.rpcUrl, CONTRACTS.escrowVault, 'jobs_dict', `${jobId}:request_hash`);
+      const requestHash = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'jobs_dict', `${jobId}:request_hash`);
       this.logger.info(`Job ${jobId} request: ${requestHash}`);
 
       // Run inference
@@ -298,8 +305,7 @@ export class CasperEscrowBridge {
     }
   }
 
-  async computeHash(str) {
-    const { createHash } = await import('crypto');
+  computeHash(str) {
     return createHash('sha256').update(str).digest('hex');
   }
 
@@ -333,30 +339,30 @@ export class CasperEscrowBridge {
         }
 
         if (attempts < maxAttempts) {
-          setTimeout(check, 15000);
+          setTimeout(check, 15000).unref();
         } else {
           this.logger.warn(`Job ${jobId} settlement timeout`);
         }
       } catch (e) {
         this.logger.error(`Monitor error for ${jobId}: ${e.message}`);
-        if (attempts < maxAttempts) setTimeout(check, 15000);
+        if (attempts < maxAttempts) setTimeout(check, 15000).unref();
       }
     };
 
-    setTimeout(check, 15000);
+    setTimeout(check, 15000).unref();
   }
 
   // --- Transaction helpers ---
 
   async providerAck(jobId) {
-    await this.sendDeploy(CONTRACTS.escrowVault, 'provider_ack', {
+    await this.sendDeploy(this.contracts.escrowVault, 'provider_ack', {
       job_id: CLValue.newCLString(jobId),
     });
     this.logger.info(`provider_ack sent for ${jobId}`);
   }
 
   async providerComplete(jobId, responseHash) {
-    await this.sendDeploy(CONTRACTS.escrowVault, 'provider_complete', {
+    await this.sendDeploy(this.contracts.escrowVault, 'provider_complete', {
       job_id: CLValue.newCLString(jobId),
       response_hash: CLValue.newCLString(responseHash),
     });
@@ -364,7 +370,7 @@ export class CasperEscrowBridge {
   }
 
   async claimPayment(jobId) {
-    await this.sendDeploy(CONTRACTS.escrowVault, 'claim_payment', {
+    await this.sendDeploy(this.contracts.escrowVault, 'claim_payment', {
       job_id: CLValue.newCLString(jobId),
     });
     this.logger.info(`claim_payment sent for ${jobId}`);
@@ -396,19 +402,19 @@ export class CasperEscrowBridge {
     const paymentItem = ExecutableDeployItem.standardPayment(payment);
     const header = DeployHeader.default();
     header.account = publicKey;
-    header.chainName = CHAIN_NAME;
+    header.chainName = this.chainName;
     return Deploy.makeDeploy(header, paymentItem, session);
   }
 
   async getJobState(jobId) {
-    const stateVal = await getDictionaryItem(this.rpcUrl, CONTRACTS.escrowVault, 'jobs_dict', `${jobId}:state`);
+    const stateVal = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'jobs_dict', `${jobId}:state`);
     return stateVal !== null ? Number(stateVal) : null;
   }
 
   getStatus() {
     return {
       running: this.isRunning,
-      network: CHAIN_NAME,
+      network: this.chainName,
       rpcUrl: this.rpcUrl,
       providerAccount: this.providerAccountHash || null,
       hasKey: !!this.providerKey,
