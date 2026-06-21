@@ -99,7 +99,7 @@ USER chimera
 ENV NODE_ENV=production
 ENV PORT=3002
 ENV OPENVIKING_URL=http://127.0.0.1:1933
-ENV OPENVIKING_API_KEY=chimera-local-dev-key
+ENV OPENVIKING_API_KEY=""
 ENV PATH="/app/.venv/bin:${PATH}"
 
 EXPOSE 3002

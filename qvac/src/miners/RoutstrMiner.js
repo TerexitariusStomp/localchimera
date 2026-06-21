@@ -54,8 +54,6 @@ export class RoutstrMiner {
     const candidates = [
       join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'routstr'),
       join(process.cwd(), 'routstr'),
-      join(homedir(), 'CascadeProjects', 'qvac-chimera', 'routstr'),
-      '/home/user/CascadeProjects/qvac-chimera/routstr'
     ];
     for (const p of candidates) {
       if (existsSync(join(p, 'docker-compose.yml'))) return p;

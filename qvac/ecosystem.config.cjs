@@ -22,7 +22,7 @@ module.exports = {
       max_memory_restart: '4G',
       env: {
         NODE_ENV: 'production',
-        PORT: process.env.PORT || 3000,
+        PORT: process.env.PORT || 3002,
         ORCHESTRATOR_ROLE: process.env.ORCHESTRATOR_ROLE || 'commander',
         COMMANDER_URL: process.env.COMMANDER_URL || '',
         ORCHESTRATOR_TAGS: process.env.ORCHESTRATOR_TAGS || 'collaborative,ai-generated',

@@ -165,7 +165,7 @@ export class NodeManager {
     this.isRunning = true;
     this.logger.info('Node started successfully');
     this.logger.info(`Node ID: ${this.config.node.id}`);
-    this.logger.info(`Dashboard API available at http://localhost:3000/api/status`);
+    this.logger.info(`Dashboard API available at http://localhost:${process.env.PORT || 3002}/api/status`);
   }
   
   async stop() {

@@ -25,6 +25,7 @@ export class WebServer {
     this.logger = new Logger('WebServer');
     this.server = null;
     this.port = process.env.PORT || 3002;
+    this.corsOrigin = process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? null : '*');
     this.indexer = new MarkdownIndexer();
     this.orchestrator = new NodeOrchestrator();
     this.payoutRouter = new PayoutRouter();
@@ -150,10 +151,18 @@ Copy the topic hex and invite others to join.
     this.logger.info('Starting web server...');
     
     this.server = createServer(async (req, res) => {
-      // CORS for all responses
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      // CORS — configurable via CORS_ORIGIN env var
+      const origin = req.headers['origin'];
+      if (this.corsOrigin === '*') {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      } else if (this.corsOrigin && origin === this.corsOrigin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+      }
+      if (this.corsOrigin) {
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      }
       if (req.method === 'OPTIONS') {
         res.writeHead(204);
         res.end();

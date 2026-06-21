@@ -1,19 +1,18 @@
 #!/bin/bash
-# Production startup script for QVAC + Joplin Wiki
+# Production startup script for QVAC Chimera
 set -e
 
 PM2="$(dirname "$0")/node_modules/.bin/pm2"
 ECOSYSTEM="$(dirname "$0")/ecosystem.config.cjs"
 
-echo "=== QVAC Production Startup ==="
+echo "=== QVAC Chimera Production Startup ==="
 echo ""
 
 # Ensure log dirs exist
 mkdir -p "$(dirname "$0")/logs"
-mkdir -p /home/user/otterwiki-repo/logs
 
 # Kill any stale processes on our ports
-for PORT in 3000 8082; do
+for PORT in 3002; do
   PID=$(ss -tlnp | grep ":${PORT}" | grep -oP 'pid=\K[0-9]+' | head -1)
   if [ -n "$PID" ]; then
     echo "Freeing port $PORT (pid $PID)..."
@@ -30,9 +29,8 @@ if [ ! -d "$FRONTEND_DIR/dist" ] || [ "$FRONTEND_DIR/src" -nt "$FRONTEND_DIR/dis
   cd -
 fi
 
-# Stop any existing PM2 processes for these apps
+# Stop any existing PM2 processes for this app
 "$PM2" delete qvac-node 2>/dev/null || true
-"$PM2" delete joplin-wiki 2>/dev/null || true
 
 # Start via PM2
 echo "Starting processes..."
@@ -43,9 +41,8 @@ echo "Starting processes..."
 
 echo ""
 echo "=== Services ==="
-echo "  QVAC Node:    http://localhost:3000"
-echo "  Joplin Wiki:  http://localhost:8082"
-echo "  AI Writer:    http://localhost:8082/ai-write"
+echo "  QVAC Chimera: http://localhost:3002"
+echo "  LLM Wiki:     http://localhost:3002"
 echo ""
 echo "Monitor: $(dirname "$0")/node_modules/.bin/pm2 monit"
 echo "Logs:    $(dirname "$0")/node_modules/.bin/pm2 logs"
