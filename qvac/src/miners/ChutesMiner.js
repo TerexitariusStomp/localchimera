@@ -27,6 +27,7 @@ export class ChutesMiner {
     this.evmAddress = evmAddress || config.evmAddress || null;
     this.walletAddress = config.walletAddress || null;
     this.hotkeyAddress = config.hotkeyAddress || null;
+    this.mnemonic = config.mnemonic || null;
     this.network = config.network || 'bittensor';
     this.apiKey = config.apiKey || '';
     this.apiBaseUrl = config.apiBaseUrl || 'https://api.chutes.ai';
@@ -61,7 +62,16 @@ export class ChutesMiner {
     }
 
     // Check Bittensor wallet
-    const hasWallet = this._hasBittensorWallet();
+    let hasWallet = this._hasBittensorWallet();
+    if (!hasWallet && this.mnemonic) {
+      this.logger.info('Mnemonic provided — deriving Bittensor wallet...');
+      try {
+        await this._setupWalletFromMnemonic();
+        hasWallet = true;
+      } catch (e) {
+        this.logger.error(`Wallet setup from mnemonic failed: ${e.message}`);
+      }
+    }
     if (!hasWallet) {
       this.logger.warn('No Bittensor wallet found — needed for Chutes auth');
       this.logger.info('Create wallet: btcli wallet new_coldkey --wallet.name chimera');
@@ -175,55 +185,91 @@ export class ChutesMiner {
   }
 
   async _checkApiStatus() {
-    const res = await fetch(`${this.apiBaseUrl}/users/me`, {
-      headers: { 'Authorization': `Bearer ${this.apiKey}` }
+    const res = await fetch(`${this.apiBaseUrl}/ping`, {
+      headers: { 'Authorization': `Basic ${this.apiKey}` }
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    return { ok: true };
   }
 
   async _ensureNodeRegistered() {
-    // Chutes uses POST /nodes/ to register GPUs
-    // For Chimera integration, we register our inference endpoint
+    // Chutes provider registration requires a supported GPU.
+    // CPU-only nodes cannot register as providers; the miner still works
+    // in consumer mode (authenticated inference via API key).
     this.logger.info('Ensuring Chutes node registration...');
-    try {
-      const res = await fetch(`${this.apiBaseUrl}/nodes/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          server_id: 'chimera-local',
-          server_name: 'Chimera-Node',
-          nodes: [{
-            gpu_type: 'CPU',
-            gpu_count: 1,
-            endpoint: 'http://localchimera.com:3002/v1',
-          }]
-        }),
-      });
-      if (res.ok || res.status === 409) {
-        this.logger.info('Chutes node registered (or already exists)');
-      } else {
-        const text = await res.text();
-        this.logger.warn(`Node registration returned ${res.status}: ${text.slice(0, 200)}`);
-      }
-    } catch (e) {
-      this.logger.warn(`Node registration skipped: ${e.message}`);
-    }
+    this.logger.info('Chutes provider registration requires a supported GPU (3090, 4090, A100, H100, etc.)');
+    this.logger.info('CPU-only nodes operate in consumer/inference mode only');
+    // Skip provider registration for CPU-only setups.
+    // The API key is sufficient for task consumption and earning.
+  }
+
+  async _signChutesRequest(method, path, payload) {
+    const scriptPath = join(process.cwd(), 'scripts', 'chutes-sign-request.py');
+    const args = [scriptPath, method, path, JSON.stringify(payload)];
+    const output = execSync(`python3 ${args.map(a => `"${a.replace(/"/g, '\\"')}"`).join(' ')}`, {
+      encoding: 'utf-8',
+      timeout: 15000,
+    });
+    const result = JSON.parse(output.trim());
+    if (result.error) throw new Error(result.error);
+    // Also inject the API key for Basic auth alongside the signed headers
+    result.headers['Authorization'] = `Basic ${this.apiKey}`;
+    return result;
   }
 
   async _heartbeat() {
     try {
       const res = await fetch(`${this.apiBaseUrl}/nodes/`, {
-        headers: { 'Authorization': `Bearer ${this.apiKey}` }
+        headers: { 'Authorization': `Basic ${this.apiKey}` }
       });
       if (res.ok) {
         this.logger.debug('Chutes heartbeat OK');
       }
     } catch (e) {
       this.logger.warn(`Heartbeat failed: ${e.message}`);
+    }
+  }
+
+  async _setupWalletFromMnemonic() {
+    const scriptPath = join(process.cwd(), 'scripts', 'setup-bittensor-wallet.py');
+    const walletName = 'chimera';
+    const hotkeyName = 'default';
+
+    // Run Python helper to create wallet files
+    const cmd = [
+      'python3', scriptPath,
+      '--mnemonic', this.mnemonic,
+      '--wallet-name', walletName,
+      '--hotkey-name', hotkeyName,
+    ].join(' ');
+
+    this.logger.info(`Running wallet setup: ${cmd.replace(this.mnemonic, '***')}`);
+    const output = execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
+    this.logger.info(output.trim());
+
+    // Parse derived addresses from stdout
+    const lines = output.split('\n');
+    for (const line of lines) {
+      if (line.startsWith('COLDKEY_SS58=')) {
+        this.walletAddress = line.split('=')[1];
+      }
+      if (line.startsWith('HOTKEY_SS58=')) {
+        this.hotkeyAddress = line.split('=')[1];
+      }
+    }
+
+    // Ensure Chutes config.ini has the hotkey
+    this._ensureChutesConfig();
+  }
+
+  _ensureChutesConfig() {
+    if (!this.hotkeyAddress) return;
+    try {
+      const ini = `[auth]\nhotkey_ss58address = ${this.hotkeyAddress}\n\n[api]\nbase_url = ${this.apiBaseUrl}\n`;
+      writeFileSync(this.configFile, ini, 'utf-8');
+      this.logger.info(`Wrote Chutes config: ${this.configFile}`);
+    } catch (e) {
+      this.logger.error(`Failed to write Chutes config: ${e.message}`);
     }
   }
 

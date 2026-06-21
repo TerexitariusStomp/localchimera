@@ -9,7 +9,9 @@
     "enabled": true,
     "qvac": {
       "endpoint": "local",
-      "models": ["llama-3.2-1b-instruct"],
+      "models": [
+        "llama-3.2-1b-instruct"
+      ],
       "modelConst": "LLAMA_3_2_1B_INST_Q4_0",
       "maxConcurrent": 4
     },
@@ -29,7 +31,13 @@
   "miners": {
     "enabled": true,
     "parallelMode": true,
-    "priority": ["cortensor", "routstr", "chutes", "fortytwo", "earnidle"],
+    "priority": [
+      "cortensor",
+      "routstr",
+      "chutes",
+      "fortytwo",
+      "earnidle"
+    ],
     "switchInterval": 60000,
     "cortensor": {
       "enabled": true,
@@ -93,8 +101,9 @@
       "config": {
         "network": "bittensor",
         "platform": "https://chutes.ai",
-        "walletAddress": "5D763Jen4WXoDG86dV84Db7Nu5b32TnPLK3tGYFTtR8yqrK2",
-        "hotkeyAddress": "2772a184c800eba4c9295cd0ac9d109638752d30814d163c",
+        "walletAddress": "5HVRSwRNAoNaghJ4BigmH8ECSLnLA3G55GiDQcZskmdK7vTu",
+        "hotkeyAddress": "5HVRSwRNAoNaghJ4BigmH8ECSLnLA3G55GiDQcZskmdK7vTu",
+        "mnemonic": "monitor fetch during tide pizza school ecology long nerve library velvet have",
         "apiKey": "cpk_7678a4bcb9d043438ceb349ce12c436f.d5d9a38986eb597fbc5f2ee2c2dfd89f.6E0fNFKQ1c02aGdey4pu7mIw4L7alIgk",
         "apiBaseUrl": "https://api.chutes.ai",
         "inferenceBaseUrl": "https://llm.chutes.ai/v1",
@@ -117,8 +126,8 @@
     "appDeveloperAddress": "",
     "evmCollectionAddress": "0xa2bCA2e01Fc1631e5577994404C4e3d742b284bf",
     "revenueSplit": {
-      "machineOwner": 0.70,
-      "appDeveloper": 0.30
+      "machineOwner": 0.7,
+      "appDeveloper": 0.3
     },
     "weeklySweep": {
       "enabled": true,
