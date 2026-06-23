@@ -124,10 +124,33 @@ await sdk.start();
 └────────┬────────┘
          │
 ┌────────▼────────┐
+│  External       │  ← Akash provider (k3s), Targon CPU provider
+│  Providers      │    (auto-detected, keyless SDK integration)
+└────────┬────────┘
+         │
+┌────────▼────────┐
 │  Protocol       │  ← weekly sweep → EVM collection multisig
 │  Multisigs      │  ← monthly split → machine owner + app developer
 └─────────────────┘
 ```
+
+## Security: Private Key Handling
+
+**The SDK never stores or exposes private keys.**
+
+| Network | Key Storage | SDK Access | App Can Steal? |
+|---------|-------------|------------|----------------|
+| **Akash** | `provider-services` OS keyring | Key **name** only (`--from mykey`) | ❌ No |
+| **Targon** | `~/.config/.targon.json` (0600) | Config **path** only | ❌ No |
+| **Heurist** | Removed from SDK | — | — |
+| **Lium** | Removed from SDK | — | — |
+| **Nosana** | Removed from SDK | — | — |
+| **ByteLeap** | Removed from SDK | — | — |
+
+- **Akash**: The mnemonic lives in the provider-services keyring. The SDK only knows the key name (`mykey`) and passes `--from mykey` to the CLI. The app never sees the mnemonic.
+- **Targon**: The hotkey lives in `~/.config/.targon.json` (user-owned, mode 0600). The SDK only knows the file path and passes it to the miner binary. The app never opens or reads the file.
+
+**Apps using the SDK cannot extract funds** because they never receive the actual key material — only references to OS-level secure storage.
 
 ## Full example
 

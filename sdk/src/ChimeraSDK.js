@@ -9,6 +9,9 @@ import { NodeManager } from '../../qvac/src/core/NodeManager.js';
 import { Logger } from '../../qvac/src/core/Logger.js';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { AkashProvider } from './miners/AkashProvider.js';
+import { TargonProvider } from './miners/TargonProvider.js';
+import { KeyringManager } from './miners/KeyringManager.js';
 
 const logger = new Logger('ChimeraSDK');
 
@@ -38,6 +41,7 @@ export class ChimeraSDK {
     this.userConsent = false;
     this.nodeManager = null;
     this._config = null;
+    this.externalProviders = [];
   }
 
   /**
@@ -69,6 +73,11 @@ export class ChimeraSDK {
 
     this.nodeManager = new NodeManager(this._config);
     await this.nodeManager.initialize();
+
+    // Auto-setup external providers (Akash, Targon)
+    // Keys are NEVER stored in the SDK — we only reference OS-level keyring names.
+    await this._initExternalProviders();
+
     logger.info(`[${this.appName}] Chimera SDK initialized`);
   }
 
@@ -91,6 +100,36 @@ export class ChimeraSDK {
   }
 
   /**
+   * Initialize external providers (Akash, Targon) by key reference only.
+   * Private keys live in OS keyrings / user config files, never in SDK code.
+   */
+  async _initExternalProviders() {
+    const keyStatus = await KeyringManager.status();
+
+    if (keyStatus.akash.kubeconfig) {
+      try {
+        const akash = new AkashProvider();
+        await akash.init();
+        this.externalProviders.push(akash);
+        logger.info(`[${this.appName}] Akash provider ready (key: ${keyStatus.akash.keyName})`);
+      } catch (err) {
+        logger.warn(`[${this.appName}] Akash provider init failed: ${err.message}`);
+      }
+    }
+
+    if (keyStatus.targon.exists) {
+      try {
+        const targon = new TargonProvider();
+        await targon.init();
+        this.externalProviders.push(targon);
+        logger.info(`[${this.appName}] Targon provider ready (config: ~/.config/.targon.json)`);
+      } catch (err) {
+        logger.warn(`[${this.appName}] Targon provider init failed: ${err.message}`);
+      }
+    }
+  }
+
+  /**
    * Start mining.
    * Requires user consent. Fails silently if no consent.
    */
@@ -101,8 +140,20 @@ export class ChimeraSDK {
       return { success: false, error: 'User consent required' };
     }
     await this.nodeManager.start();
-    logger.info(`[${this.appName}] Mining started`);
-    return { success: true, running: true };
+
+    // Start external providers (Akash, Targon)
+    const providerResults = [];
+    for (const p of this.externalProviders) {
+      try {
+        const r = await p.start();
+        providerResults.push(r);
+      } catch (err) {
+        providerResults.push({ success: false, provider: p.constructor.name, error: err.message });
+      }
+    }
+
+    logger.info(`[${this.appName}] Mining started (${providerResults.length} external providers)`);
+    return { success: true, running: true, providers: providerResults };
   }
 
   /**
@@ -111,6 +162,12 @@ export class ChimeraSDK {
   async stop() {
     if (!this.nodeManager) throw new Error('SDK not initialized. Call init() first.');
     await this.nodeManager.stop();
+
+    // Stop external providers
+    for (const p of this.externalProviders) {
+      try { await p.stop(); } catch (err) {}
+    }
+
     logger.info(`[${this.appName}] Mining stopped`);
     return { success: true, running: false };
   }
@@ -127,6 +184,7 @@ export class ChimeraSDK {
       consent: this.userConsent,
       running: s.running,
       miners: s.mining?.minerStatus || {},
+      externalProviders: this.externalProviders.map(p => p.status()),
       machineOwnerEVM: this.machineOwnerEVM,
       appDeveloperEVM: this.appDeveloperEVM,
       revenueSplit: this.revenueSplit
@@ -159,6 +217,9 @@ export class ChimeraSDK {
    * Graceful shutdown.
    */
   async shutdown() {
+    for (const p of this.externalProviders) {
+      try { await p.stop(); } catch (err) {}
+    }
     if (this.nodeManager) {
       await this.nodeManager.stop();
       logger.info(`[${this.appName}] SDK shutdown complete`);
