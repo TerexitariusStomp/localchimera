@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Asset } from 'expo-asset';
-import { loadModel, completion, LLAMA_3_2_1B_INST_Q4_0 } from '@qvac/sdk';
+import { loadModel, completion, BITNET_0_7B_INST_TQ2_0 } from '@qvac/sdk';
 
 export default function App() {
   const [modelStatus, setModelStatus] = useState('idle');
@@ -34,7 +34,7 @@ export default function App() {
     setModelError(null);
     try {
       const mid = await loadModel({
-        modelSrc: LLAMA_3_2_1B_INST_Q4_0,
+        modelSrc: BITNET_0_7B_INST_TQ2_0,
         modelType: 'llm',
         onProgress: (p) => {
           setModelStatus(`loading model: ${Math.round(p * 100)}%`);
@@ -63,7 +63,7 @@ export default function App() {
         title: body.title || 'Generated',
         body: generated,
         source: 'qvac-on-device',
-        model: 'LLAMA_3_2_1B_INST_Q4_0',
+        model: 'BITNET_0_7B_INST_TQ2_0',
       },
     };
   }
@@ -74,7 +74,7 @@ export default function App() {
       data: {
         available: true,
         qvacAvailable: !!modelId,
-        model: modelId ? 'LLAMA_3_2_1B_INST_Q4_0' : null,
+        model: modelId ? 'BITNET_0_7B_INST_TQ2_0' : null,
         modelLoading: !modelId && modelStatus !== 'ready',
       },
     };

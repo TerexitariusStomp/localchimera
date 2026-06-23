@@ -291,7 +291,6 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          ndk: 29.0.14206865
       - name: Install frontend deps
         run: |
           cd qvac/frontend
