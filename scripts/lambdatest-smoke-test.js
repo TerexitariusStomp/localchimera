@@ -18,7 +18,7 @@ async function runTest() {
       'lt:options': {
         deviceName: 'Pixel 6',
         platformName: 'Android',
-        platformVersion: '13',
+        platformVersion: '12',
         isRealMobile: true,
         build: `Chimera-${process.env.GITHUB_RUN_ID || 'local'}`,
         name: 'Smoke test - Enable AI button',

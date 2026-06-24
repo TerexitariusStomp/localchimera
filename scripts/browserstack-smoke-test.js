@@ -16,7 +16,7 @@ async function runTest() {
     connectionRetryTimeout: 120000,
     capabilities: {
       'bstack:options': {
-        osVersion: '13.0',
+        osVersion: '12.0',
         deviceName: 'Google Pixel 6',
         projectName: 'Chimera',
         buildName: `build-${process.env.GITHUB_RUN_ID || 'local'}`,

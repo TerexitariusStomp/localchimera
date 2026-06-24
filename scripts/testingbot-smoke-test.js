@@ -23,7 +23,7 @@ async function runTest() {
       'appium:options': {
         app: process.env.TESTINGBOT_APP_URL,
         deviceName: 'Pixel 6',
-        platformVersion: '13',
+        platformVersion: '12',
         automationName: 'UiAutomator2',
       },
     },
