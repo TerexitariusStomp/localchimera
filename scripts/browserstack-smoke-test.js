@@ -58,6 +58,12 @@ async function runTest() {
     }
 
     if (enableAIBtn) {
+      // Clear logcat before tapping
+      try {
+        await browser.execute('mobile: shell', { command: 'logcat', args: ['-c'] });
+        console.log('Logcat cleared');
+      } catch (e) { console.log('Could not clear logcat:', e.message); }
+
       await enableAIBtn.click();
       console.log('Tapped Enable AI button');
       await browser.pause(3000);
@@ -100,6 +106,13 @@ async function runTest() {
       if (!success && !failureReason) {
         failureReason = 'Timed out waiting for model load result';
       }
+
+      // Capture logcat after test
+      try {
+        const logcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '-t', '500'] });
+        fs.writeFileSync(path.join(__dirname, 'logcat.txt'), logcat || '(empty)');
+        console.log('Logcat saved to logcat.txt');
+      } catch (e) { console.log('Could not capture logcat:', e.message); }
     } else {
       await browser.saveScreenshot(path.join(__dirname, 'screenshot-02-no-button.png'));
       failureReason = 'Enable AI button not found';
