@@ -24,10 +24,8 @@ async function runTest() {
         debug: true,
         networkLogs: true,
       },
-      'appium:options': {
-        app: process.env.BROWSERSTACK_APP_URL,
-        automationName: 'UiAutomator2',
-      },
+      'appium:app': process.env.BROWSERSTACK_APP_URL,
+      'appium:automationName': 'UiAutomator2',
     },
   });
 
