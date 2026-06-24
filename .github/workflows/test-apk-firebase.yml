@@ -1,0 +1,42 @@
+name: Test APK on Firebase Test Lab
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  firebase-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download latest APK
+        run: |
+          curl -sL -o chimera.apk "https://github.com/LocalChimera/localchimera/releases/latest/download/app-arm64-v8a-release.apk"
+          ls -lh chimera.apk
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Run Firebase Test Lab (physical device)
+        run: |
+          gcloud firebase test android run \
+            --type robo \
+            --app chimera.apk \
+            --device model=oriole,version=33,locale=en,orientation=portrait \
+            --timeout 5m \
+            --results-bucket=chimera-test-results \
+            --results-dir=run_${{ github.run_id }} \
+            --robo-directives text:ai-prompt-input="hello world" \
+            2>&1 | tee testlab-output.txt
+
+      - name: Upload Test Lab results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firebase-testlab-results
+          path: testlab-output.txt
