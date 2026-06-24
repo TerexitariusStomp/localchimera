@@ -1,0 +1,35 @@
+name: Test APK on Cloud Emulator
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  cloud-emulator-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Download latest APK
+        run: |
+          curl -sL -o chimera.apk "https://github.com/LocalChimera/localchimera/releases/latest/download/app-arm64-v8a-release.apk"
+          ls -lh chimera.apk
+      - name: Test on cloud Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          profile: pixel_4
+          ram-size: 4096M
+          disk-size: 8192M
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect
+          script: |
+            adb wait-for-device
+            adb shell getprop sys.boot_completed
+            adb install chimera.apk
+            adb shell am start -n com.localchimera.app/.MainActivity
+            sleep 15
+            adb logcat -d | grep -iE "qvac|chimera|model|loading|FATAL|crash" | tail -50
