@@ -102,7 +102,6 @@ export const ROUTES = [
   ['POST', '/api/model/switch',            'handleModelSwitch'],
   ['GET',  '/api/model/current',           'handleModelCurrent'],
   // Memory Compactor
-  ['GET',  '/api/memory/status',           'handleMemoryStatus'],
   // Knowledge Graph
   ['GET',  '/api/kg/status',               'handleKGStatus'],
   ['GET',  '/api/kg/search',               'handleKGSearch'],
