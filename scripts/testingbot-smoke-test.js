@@ -2,6 +2,8 @@ const { remote } = require('webdriverio');
 const fs = require('fs');
 const path = require('path');
 
+const TEST_WALLET = '0x1234567890123456789012345678901234567890';
+
 async function runTest() {
   console.log('Starting TestingBot smoke test...');
   console.log('App URL:', process.env.TESTINGBOT_APP_URL);
@@ -31,119 +33,125 @@ async function runTest() {
   let failureReason = '';
 
   try {
-    // Wait for app to fully launch (emulators can be slow)
-    await browser.pause(10000);
+    await browser.pause(8000);
     await browser.saveScreenshot(path.join(__dirname, 'screenshot-01-launch.png'));
-    console.log('Screenshot 1: app launched');
+    console.log('Screenshot 1: setup screen');
 
-    let enableAIBtn = null;
-    const selectors = [
-      '//*[contains(@text, "Enable AI")]',
-      '//*[contains(@text, "enable ai")]',
-      '//android.widget.Button[contains(@text, "Enable")]',
-      '//android.widget.TextView[contains(@text, "Enable")]',
-      'android=new UiSelector().textContains("Enable")',
+    // Find the wallet input
+    let walletInput = null;
+    const walletSelectors = [
+      'android.widget.EditText',
+      '//android.widget.EditText',
+      '//*[contains(@text, "EVM wallet")]',
+      'android=new UiSelector().className("android.widget.EditText")',
     ];
-
-    // Retry finding the button for up to 30s (app may still be loading)
-    for (let retry = 0; retry < 6 && !enableAIBtn; retry++) {
-      for (const sel of selectors) {
-        try {
-          const el = await browser.$(sel);
-          if (await el.isExisting()) {
-            enableAIBtn = el;
-            console.log('Found Enable AI button with selector:', sel);
-            break;
-          }
-        } catch (e) {}
-      }
-      if (!enableAIBtn) {
-        console.log(`Button not found yet, retry ${retry + 1}/6...`);
-        await browser.pause(5000);
-      }
+    for (const sel of walletSelectors) {
+      try {
+        const el = await browser.$(sel);
+        if (await el.isExisting()) {
+          walletInput = el;
+          console.log('Found wallet input with selector:', sel);
+          break;
+        }
+      } catch (e) {}
     }
 
-    if (enableAIBtn) {
-      try {
-        await browser.execute('mobile: shell', { command: 'logcat', args: ['-c'] });
-        console.log('Logcat cleared');
-      } catch (e) { console.log('Could not clear logcat:', e.message); }
-
-      await enableAIBtn.click();
-      console.log('Tapped Enable AI button');
-      await browser.pause(3000);
-      await browser.saveScreenshot(path.join(__dirname, 'screenshot-02-after-tap.png'));
-
-      // Model load detection logic:
-      // - idle: "Enable AI" button visible
-      // - loading: "loading model" text visible
-      // - ready: overlay disappears entirely (no Enable AI, no loading, no error)
-      // - error: "Model load failed" text visible
-      const startTime = Date.now();
-      let lastProgressLog = '';
-      while (Date.now() - startTime < 180000) {
-        await browser.saveScreenshot(path.join(__dirname, 'screenshot-03-checking.png'));
-
-        // Check for error
-        try {
-          const errorEl = await browser.$('//*[contains(@text, "Model load failed") or contains(@text, "failed")]');
-          if (await errorEl.isExisting()) {
-            const txt = await errorEl.getText();
-            console.log('Model load error text:', txt);
-            failureReason = txt;
-            break;
-          }
-        } catch (e) {}
-
-        // Check for loading progress
-        try {
-          const loadingEl = await browser.$('//*[contains(@text, "loading model")]');
-          if (await loadingEl.isExisting()) {
-            const txt = await loadingEl.getText();
-            if (txt !== lastProgressLog) {
-              console.log('Progress:', txt);
-              lastProgressLog = txt;
-            }
-          }
-        } catch (e) {}
-
-        // Check for success: "Enable AI" button and loading text are both gone
-        try {
-          const enableBtn = await browser.$('//*[contains(@text, "Enable AI")]');
-          const loadingText = await browser.$('//*[contains(@text, "loading model")]');
-          const errorText = await browser.$('//*[contains(@text, "Model load failed")]');
-          const btnExists = await enableBtn.isExisting();
-          const loadingExists = await loadingText.isExisting();
-          const errorExists = await errorText.isExisting();
-          if (!btnExists && !loadingExists && !errorExists) {
-            console.log('SUCCESS: Model loaded — overlay disappeared');
-            success = true;
-            break;
-          }
-        } catch (e) {}
-
-        await browser.pause(5000);
-      }
-
-      if (!success && !failureReason) {
-        failureReason = 'Timed out waiting for model load result';
-      }
-
-      try {
-        const logcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '-t', '500'] });
-        fs.writeFileSync(path.join(__dirname, 'logcat.txt'), logcat || '(empty)');
-        console.log('Logcat saved to logcat.txt');
-      } catch (e) { console.log('Could not capture logcat:', e.message); }
-    } else {
-      await browser.saveScreenshot(path.join(__dirname, 'screenshot-02-no-button.png'));
-      failureReason = 'Enable AI button not found';
-      console.log('Enable AI button not found');
+    if (!walletInput) {
+      failureReason = 'Wallet address input not found on setup screen';
+      console.log(failureReason);
       try {
         const source = await browser.getPageSource();
         fs.writeFileSync(path.join(__dirname, 'page-source.xml'), source);
-        console.log('Page source saved to page-source.xml');
       } catch (e) {}
+    } else {
+      await walletInput.setValue(TEST_WALLET);
+      console.log('Entered wallet address');
+      await browser.pause(1000);
+      await browser.saveScreenshot(path.join(__dirname, 'screenshot-02-wallet-entered.png'));
+
+      // Find and tap the Start button
+      let startBtn = null;
+      const startSelectors = [
+        '//*[contains(@text, "Start")]',
+        '//android.widget.Button[contains(@text, "Start")]',
+        'android=new UiSelector().textContains("Start")',
+      ];
+      for (const sel of startSelectors) {
+        try {
+          const el = await browser.$(sel);
+          if (await el.isExisting()) {
+            startBtn = el;
+            console.log('Found Start button with selector:', sel);
+            break;
+          }
+        } catch (e) {}
+      }
+
+      if (!startBtn) {
+        failureReason = 'Start button not found';
+        console.log(failureReason);
+      } else {
+        await startBtn.click();
+        console.log('Tapped Start button');
+        await browser.pause(3000);
+        await browser.saveScreenshot(path.join(__dirname, 'screenshot-03-after-start.png'));
+
+        // Wait for model load: success is the WebView appearing (setup screen gone)
+        const startTime = Date.now();
+        let lastProgress = '';
+        while (Date.now() - startTime < 240000) {
+          await browser.saveScreenshot(path.join(__dirname, 'screenshot-04-checking.png'));
+
+          // Check for error text
+          try {
+            const errorEl = await browser.$('//*[contains(@text, "Model error") or contains(@text, "error")]');
+            if (await errorEl.isExisting()) {
+              const txt = await errorEl.getText();
+              console.log('Error text:', txt);
+              failureReason = txt;
+              break;
+            }
+          } catch (e) {}
+
+          // Check for loading progress text
+          try {
+            const loadingEl = await browser.$('//*[contains(@text, "loading model")]');
+            if (await loadingEl.isExisting()) {
+              const txt = await loadingEl.getText();
+              if (txt !== lastProgress) {
+                console.log('Progress:', txt);
+                lastProgress = txt;
+              }
+            }
+          } catch (e) {}
+
+          // Success: setup screen elements are gone and WebView is present
+          try {
+            const walletInputCheck = await browser.$('//*[contains(@text, "EVM wallet")]');
+            const startBtnCheck = await browser.$('//*[contains(@text, "Start")]');
+            const inputExists = await walletInputCheck.isExisting();
+            const btnExists = await startBtnCheck.isExisting();
+            if (!inputExists && !btnExists) {
+              console.log('SUCCESS: Setup screen passed — WebView is showing');
+              success = true;
+              break;
+            }
+          } catch (e) {}
+
+          await browser.pause(5000);
+        }
+
+        if (!success && !failureReason) {
+          failureReason = 'Timed out waiting for model load result';
+        }
+      }
     }
+
+    try {
+      const logcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '-t', '500'] });
+      fs.writeFileSync(path.join(__dirname, 'logcat.txt'), logcat || '(empty)');
+      console.log('Logcat saved to logcat.txt');
+    } catch (e) { console.log('Could not capture logcat:', e.message); }
   } catch (e) {
     console.error('Test error:', e);
     failureReason = e.message;

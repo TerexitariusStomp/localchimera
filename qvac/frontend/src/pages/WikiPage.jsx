@@ -896,6 +896,38 @@ export default function WikiPage({ onBack }) {
           }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e2d8', marginBottom: 16 }}>Settings</div>
 
+            {/* Mobile device start */}
+            <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: 13, color: '#b0a898', marginBottom: 4 }}>Start device now</div>
+              <div style={{ fontSize: 11, color: '#4a4540', marginBottom: 10 }}>Enter your EVM wallet address and start the local AI.</div>
+              <input
+                type="text"
+                placeholder="0x... EVM wallet address"
+                value={evmAddress}
+                onChange={e => { setEvmAddress(e.target.value); setWalletError(''); }}
+                style={{
+                  width: '100%', padding: '8px 10px', borderRadius: 6,
+                  border: `1px solid ${walletError ? '#b91c1c' : 'rgba(255,255,255,0.1)'}`,
+                  background: '#0a0a12', color: '#e8e2d8', fontSize: 12,
+                  fontFamily: "ui-monospace, SFMono-Regular, 'Cascadia Code', 'Fira Code', monospace",
+                  outline: 'none', marginBottom: 8
+                }}
+              />
+              {walletError && <div style={{ fontSize: 11, color: '#fca5a5', marginBottom: 6 }}>{walletError}</div>}
+              <button
+                onClick={startNode}
+                disabled={nodeRunning}
+                style={{
+                  width: '100%', padding: '8px 0', borderRadius: 6, border: 'none',
+                  background: nodeRunning ? '#166534' : '#c9a96e',
+                  color: nodeRunning ? '#86efac' : '#0e0d0b',
+                  fontSize: 13, fontWeight: 600, cursor: nodeRunning ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {nodeRunning ? '▶ Running' : '▶ Start'}
+              </button>
+            </div>
+
             {[
               { key: 'boot', label: 'Start on device boot', desc: 'Auto-launch when device turns on', val: prefBoot, set: setPrefBoot },
               { key: 'home', label: 'Add to home screen', desc: 'Install as app icon', val: prefHome, set: setPrefHome },
@@ -1088,16 +1120,16 @@ export default function WikiPage({ onBack }) {
             <button
               style={{ flex: 1, padding: '5px 0', fontSize: 10, borderRadius: 5, border: 'none', cursor: 'pointer', background: nodeRunning ? '#166534' : '#161410', color: nodeRunning ? '#86efac' : '#7a7468', border: '1px solid rgba(255,255,255,0.07)' }}
               onClick={startNode}
-              disabled={nodeRunning || !authToken}
-              title={!authToken ? 'Sign in to start mining' : ''}
+              disabled={nodeRunning || (!authToken && !isNative)}
+              title={(!authToken && !isNative) ? 'Sign in to start mining' : ''}
             >
               ▶ Start
             </button>
             <button
               style={{ flex: 1, padding: '5px 0', fontSize: 10, borderRadius: 5, border: 'none', cursor: 'pointer', background: !nodeRunning ? '#450a0a' : '#161410', color: !nodeRunning ? '#fca5a5' : '#7a7468', border: '1px solid rgba(255,255,255,0.07)' }}
               onClick={stopNode}
-              disabled={!nodeRunning || !authToken}
-              title={!authToken ? 'Sign in to stop mining' : ''}
+              disabled={!nodeRunning || (!authToken && !isNative)}
+              title={(!authToken && !isNative) ? 'Sign in to stop mining' : ''}
             >
               ⏹ Stop
             </button>
