@@ -175,7 +175,7 @@ jobs:
           node-version: 20
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
       - name: Install QVAC backend deps
         run: |
           cd qvac
@@ -197,13 +197,13 @@ jobs:
         run: |
           mkdir -p apps/desktop/src-tauri/qvac
           rsync -av --exclude='node_modules' --exclude='.git' --exclude='target' qvac/ apps/desktop/src-tauri/qvac/
-      - name: Build Tauri
+      - name: Build Tauri (universal binary)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: ./apps/desktop
-          args: "--target aarch64-apple-darwin"
+          args: "--target universal-apple-darwin"
           releaseId: ${{ needs.create-release.outputs.release_id }}
 
   build-ios:

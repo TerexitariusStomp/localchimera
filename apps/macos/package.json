@@ -1,7 +1,7 @@
 {
-  "name": "chimera-desktop",
+  "name": "chimera-macos",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.22",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build --target universal-apple-darwin"
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.32.0",

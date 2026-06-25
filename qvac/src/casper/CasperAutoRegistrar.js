@@ -1,11 +1,12 @@
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 import { Logger } from '../core/Logger.js';
 
 const sdk = await import('casper-js-sdk').catch(() => null);
 
 const CHAIN_NAME = process.env.CASPER_CHAIN_NAME || 'casper-test';
 const RPC_URL = process.env.CASPER_RPC_URL || 'https://node.testnet.casper.network/rpc';
-const PAYMENT = process.env.CASPER_PAYMENT || '50000000000';
+const PAYMENT = process.env.CASPER_PAYMENT || '3000000000'; // 3 CSPR — contract pays gas via DirectInvocationOnly
 
 const CONTRACT_HASHES = {
   inferenceMarket: process.env.CASPER_INFERENCE_MARKET || '116a2fa615c47c6cf027b3c8238cee265cb5271cdc8398fa98452ccaaf11d8d9',
@@ -15,6 +16,23 @@ const CONTRACT_HASHES = {
 };
 
 const DEFAULT_STAKE_MOTES = '1000000000'; // 1 CSPR
+const THROWAWAY_KEY_DIR = join(process.env.HOME || '/tmp', '.chimera');
+const THROWAWAY_KEY_PATH = join(THROWAWAY_KEY_DIR, 'casper-throwaway.pem');
+
+function buildStringList(items) {
+  const strType = sdk.CLValue.newCLString('x').type;
+  const clTypeList = new sdk.CLTypeList();
+  clTypeList.elementsType = strType;
+  const list = new sdk.CLValueList();
+  list.type = clTypeList;
+  for (const item of items) {
+    list.append(sdk.CLValue.newCLString(item));
+  }
+  const clVal = new sdk.CLValue();
+  clVal.list = list;
+  clVal.type = clTypeList;
+  return clVal;
+}
 
 export class CasperAutoRegistrar {
   constructor(config) {
@@ -22,6 +40,7 @@ export class CasperAutoRegistrar {
     this.logger = new Logger('CasperAutoRegistrar');
     this.client = null;
     this.privateKey = null;
+    this.evmAddress = null;
     this.registered = new Set();
   }
 
@@ -32,17 +51,30 @@ export class CasperAutoRegistrar {
     }
 
     const casperConfig = this.config?.miners?.casper?.config || {};
-    const pemPath = casperConfig.providerKeyPem || process.env.CSPR_PEM_PATH || '';
-    if (!pemPath || !existsSync(pemPath)) {
-      this.logger.warn('No Casper PEM key configured — auto-registration disabled. Set miners.casper.config.providerKeyPem in config.json or CSPR_PEM_PATH env var.');
+    this.evmAddress = casperConfig.evmAddress || process.env.EVM_ADDRESS || '';
+    if (!this.evmAddress) {
+      this.logger.warn('No EVM address configured — auto-registration disabled. Set miners.casper.config.evmAddress in config.json or EVM_ADDRESS env var.');
       return false;
     }
 
+    const pemPath = casperConfig.providerKeyPem || process.env.CSPR_PEM_PATH || THROWAWAY_KEY_PATH;
     try {
-      const pem = readFileSync(pemPath, 'utf-8');
-      this.privateKey = sdk.PrivateKey.fromPem(pem, sdk.KeyAlgorithm.SECP256K1);
+      if (existsSync(pemPath)) {
+        const pem = readFileSync(pemPath, 'utf-8');
+        this.privateKey = sdk.PrivateKey.fromPem(pem, sdk.KeyAlgorithm.SECP256K1);
+      } else {
+        this.logger.info('No Casper key found — generating throwaway key for registration');
+        this.privateKey = sdk.PrivateKey.generate(sdk.KeyAlgorithm.SECP256K1);
+        try {
+          mkdirSync(THROWAWAY_KEY_DIR, { recursive: true });
+          writeFileSync(THROWAWAY_KEY_PATH, this.privateKey.toPem(), { mode: 0o600 });
+          this.logger.info(`Throwaway Casper key saved to ${THROWAWAY_KEY_PATH}`);
+        } catch (e) {
+          this.logger.warn(`Could not persist throwaway key: ${e.message}`);
+        }
+      }
       this.client = new sdk.RpcClient(new sdk.HttpHandler(RPC_URL));
-      this.logger.info(`Casper auto-registrar initialized — account: ${this.privateKey.publicKey.accountHash().toPrefixedString()}`);
+      this.logger.info(`Casper auto-registrar initialized — EVM: ${this.evmAddress}, account: ${this.privateKey.publicKey.accountHash().toPrefixedString()}`);
       return true;
     } catch (e) {
       this.logger.error(`Failed to initialize Casper auto-registrar: ${e.message}`);
@@ -59,7 +91,6 @@ export class CasperAutoRegistrar {
     const header = sdk.DeployHeader.default();
     header.account = this.privateKey.publicKey;
     header.chainName = CHAIN_NAME;
-    header.timestamp = new Date();
     const deploy = sdk.Deploy.makeDeploy(header, payment, session);
     deploy.sign(this.privateKey);
     const result = await this.client.putDeploy(deploy);
@@ -68,12 +99,10 @@ export class CasperAutoRegistrar {
 
   async _callContract(contractHash, entryPoint, args) {
     const hashHex = contractHash.replace('contract-', '').replace('hash-', '');
+    const ch = sdk.ContractHash.newContract(hashHex);
+    const storedContract = new sdk.StoredContractByHash(ch, entryPoint, args);
     const session = new sdk.ExecutableDeployItem();
-    session.storedContractByHash = {
-      hash: Buffer.from(hashHex, 'hex'),
-      entryPoint,
-      args,
-    };
+    session.storedContractByHash = storedContract;
     return this._sendDeploy(session);
   }
 
@@ -107,11 +136,12 @@ export class CasperAutoRegistrar {
         results.push({ contract: 'inferenceMarket', status: 'already_registered' });
       } else {
         const args = sdk.Args.fromMap({
+          evm_address: sdk.CLValue.newCLString(this.evmAddress),
           peer_id: sdk.CLValue.newCLString(pid),
           name: sdk.CLValue.newCLString(name),
-          has_gpu: sdk.CLValue.newCLBool(!!profile.hasGpu),
-          vram_mb: sdk.CLValue.newCLUInt64(String(profile.vramMb || 0)),
-          supported_models: sdk.CLValue.newCLList((profile.models || ['llama-3.2-1b-instruct']).map(m => sdk.CLValue.newCLString(m))),
+          has_gpu: sdk.CLValue.newCLValueBool(!!profile.hasGpu),
+          vram_mb: sdk.CLValue.newCLUint64(String(profile.vramMb || 0)),
+          supported_models: buildStringList(profile.models || ['llama-3.2-1b-instruct']),
           stake_amount: sdk.CLValue.newCLUInt512(DEFAULT_STAKE_MOTES),
         });
         const hash = await this._callContract(CONTRACT_HASHES.inferenceMarket, 'register_provider', args);
@@ -131,12 +161,13 @@ export class CasperAutoRegistrar {
         results.push({ contract: 'storageMarket', status: 'already_registered' });
       } else {
         const args = sdk.Args.fromMap({
+          evm_address: sdk.CLValue.newCLString(this.evmAddress),
           peer_id: sdk.CLValue.newCLString(pid),
           name: sdk.CLValue.newCLString(name),
-          total_capacity_mb: sdk.CLValue.newCLUInt64(String(profile.storageMb || 10240)),
+          total_capacity_mb: sdk.CLValue.newCLUint64(String(profile.storageMb || 10240)),
           price_per_mb_month: sdk.CLValue.newCLUInt512('1000000'),
-          min_storage_mb: sdk.CLValue.newCLUInt64('1'),
-          max_storage_mb: sdk.CLValue.newCLUInt64(String(profile.storageMb || 10240)),
+          min_storage_mb: sdk.CLValue.newCLUint64('1'),
+          max_storage_mb: sdk.CLValue.newCLUint64(String(profile.storageMb || 10240)),
           stake_amount: sdk.CLValue.newCLUInt512(DEFAULT_STAKE_MOTES),
         });
         const hash = await this._callContract(CONTRACT_HASHES.storageMarket, 'register_provider', args);
@@ -156,13 +187,14 @@ export class CasperAutoRegistrar {
         results.push({ contract: 'computeMarket', status: 'already_registered' });
       } else {
         const args = sdk.Args.fromMap({
+          evm_address: sdk.CLValue.newCLString(this.evmAddress),
           peer_id: sdk.CLValue.newCLString(pid),
           name: sdk.CLValue.newCLString(name),
-          runtime_types: sdk.CLValue.newCLList(['wasm', 'docker'].map(t => sdk.CLValue.newCLString(t))),
-          cpu_cores: sdk.CLValue.newCLUInt64(String(profile.cpuCores || 4)),
-          ram_mb: sdk.CLValue.newCLUInt64(String(profile.ramMb || 4096)),
-          has_gpu: sdk.CLValue.newCLBool(!!profile.hasGpu),
-          vram_mb: sdk.CLValue.newCLUInt64(String(profile.vramMb || 0)),
+          runtime_types: buildStringList(['wasm', 'docker']),
+          cpu_cores: sdk.CLValue.newCLUint64(String(profile.cpuCores || 4)),
+          ram_mb: sdk.CLValue.newCLUint64(String(profile.ramMb || 4096)),
+          has_gpu: sdk.CLValue.newCLValueBool(!!profile.hasGpu),
+          vram_mb: sdk.CLValue.newCLUint64(String(profile.vramMb || 0)),
           price_per_cpu_sec: sdk.CLValue.newCLUInt512('100000'),
           price_per_gpu_sec: sdk.CLValue.newCLUInt512('500000'),
           stake_amount: sdk.CLValue.newCLUInt512(DEFAULT_STAKE_MOTES),
@@ -184,13 +216,14 @@ export class CasperAutoRegistrar {
         results.push({ contract: 'bandwidthMarket', status: 'already_registered' });
       } else {
         const args = sdk.Args.fromMap({
+          evm_address: sdk.CLValue.newCLString(this.evmAddress),
           peer_id: sdk.CLValue.newCLString(pid),
           name: sdk.CLValue.newCLString(name),
           service_type: sdk.CLValue.newCLString('proxy'),
-          bandwidth_mbps: sdk.CLValue.newCLUInt64(String(profile.bandwidthMbps || 100)),
-          is_relay: sdk.CLValue.newCLBool(false),
-          or_port: sdk.CLValue.newCLUInt64('9001'),
-          dir_port: sdk.CLValue.newCLUInt64('9030'),
+          bandwidth_mbps: sdk.CLValue.newCLUint64(String(profile.bandwidthMbps || 100)),
+          is_relay: sdk.CLValue.newCLValueBool(false),
+          or_port: sdk.CLValue.newCLUint64('9001'),
+          dir_port: sdk.CLValue.newCLUint64('9030'),
           price_per_hour: sdk.CLValue.newCLUInt512('100000000'),
           price_per_gib: sdk.CLValue.newCLUInt512('50000000'),
           stake_amount: sdk.CLValue.newCLUInt512(DEFAULT_STAKE_MOTES),
