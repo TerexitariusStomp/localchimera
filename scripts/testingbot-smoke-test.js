@@ -74,21 +74,19 @@ async function runTest() {
       await browser.pause(3000);
       await browser.saveScreenshot(path.join(__dirname, 'screenshot-02-after-tap.png'));
 
+      // Model load detection logic:
+      // - idle: "Enable AI" button visible
+      // - loading: "loading model" text visible
+      // - ready: overlay disappears entirely (no Enable AI, no loading, no error)
+      // - error: "Model load failed" text visible
       const startTime = Date.now();
+      let lastProgressLog = '';
       while (Date.now() - startTime < 180000) {
         await browser.saveScreenshot(path.join(__dirname, 'screenshot-03-checking.png'));
 
+        // Check for error
         try {
-          const ready = await browser.$('//*[contains(@text, "ready") or contains(@text, "Ready")]');
-          if (await ready.isExisting()) {
-            console.log('SUCCESS: Model loaded successfully');
-            success = true;
-            break;
-          }
-        } catch (e) {}
-
-        try {
-          const errorEl = await browser.$('//*[contains(@text, "error") or contains(@text, "Error") or contains(@text, "failed")]');
+          const errorEl = await browser.$('//*[contains(@text, "Model load failed") or contains(@text, "failed")]');
           if (await errorEl.isExisting()) {
             const txt = await errorEl.getText();
             console.log('Model load error text:', txt);
@@ -97,15 +95,34 @@ async function runTest() {
           }
         } catch (e) {}
 
+        // Check for loading progress
         try {
-          const loading = await browser.$('//*[contains(@text, "loading") or contains(@text, "Loading")]');
-          if (await loading.isExisting()) {
-            const txt = await loading.getText();
-            console.log('Still loading:', txt);
+          const loadingEl = await browser.$('//*[contains(@text, "loading model")]');
+          if (await loadingEl.isExisting()) {
+            const txt = await loadingEl.getText();
+            if (txt !== lastProgressLog) {
+              console.log('Progress:', txt);
+              lastProgressLog = txt;
+            }
           }
         } catch (e) {}
 
-        await browser.pause(4000);
+        // Check for success: "Enable AI" button and loading text are both gone
+        try {
+          const enableBtn = await browser.$('//*[contains(@text, "Enable AI")]');
+          const loadingText = await browser.$('//*[contains(@text, "loading model")]');
+          const errorText = await browser.$('//*[contains(@text, "Model load failed")]');
+          const btnExists = await enableBtn.isExisting();
+          const loadingExists = await loadingText.isExisting();
+          const errorExists = await errorText.isExisting();
+          if (!btnExists && !loadingExists && !errorExists) {
+            console.log('SUCCESS: Model loaded — overlay disappeared');
+            success = true;
+            break;
+          }
+        } catch (e) {}
+
+        await browser.pause(5000);
       }
 
       if (!success && !failureReason) {
