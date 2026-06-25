@@ -276,8 +276,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Configure npm
-        run: npm config set legacy-peer-deps true
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
