@@ -65,3 +65,23 @@ if (fs.existsSync(ndkVersionFile)) {
     console.log('✅ Patched withAndroidNdkVersion.js to use NDK 27.2.12479018');
   }
 }
+
+// Patch @qvac/sdk's withOpenCL.js to make libOpenCL.so optional
+// Without android:required="false", devices without OpenCL refuse to install the APK
+const openClFile = path.join(sdkDir, 'withOpenCL.js');
+if (fs.existsSync(openClFile)) {
+  let openClContent = fs.readFileSync(openClFile, 'utf8');
+  // Add android:required="false" to the uses-native-library entry
+  if (openClContent.includes('"android:name": "libOpenCL.so"') && !openClContent.includes('android:required')) {
+    openClContent = openClContent.replace(
+      '"android:name": "libOpenCL.so",',
+      '"android:name": "libOpenCL.so",\n                        "android:required": false,'
+    );
+    fs.writeFileSync(openClFile, openClContent, 'utf8');
+    console.log('✅ Patched withOpenCL.js to make libOpenCL.so optional (android:required=false)');
+  } else {
+    console.log('⚠️  withOpenCL.js already patched or pattern not found, skipping');
+  }
+} else {
+  console.log('⚠️  withOpenCL.js not found, skipping OpenCL patch');
+}
