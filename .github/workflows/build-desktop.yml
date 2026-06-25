@@ -308,6 +308,8 @@ jobs:
             echo "npm install attempt $i failed, retrying in 15s..."
             sleep 15
           done
+      - name: Patch QVAC SDK (skip bare-posix Android prebuild check)
+        run: node apps/mobile-expo/scripts/patch-qvac-sdk.js
       - name: Expo prebuild (Android)
         run: |
           cd apps/mobile-expo
