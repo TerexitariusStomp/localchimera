@@ -510,35 +510,31 @@
     }
     window._chimeraOS = os;
 
-    // Pre-fetch latest release and cache for 5 minutes
-    window._chimeraRelease = null;
+    // Pre-fetch releases and cache for 5 minutes
+    window._chimeraReleases = null;
     (async () => {
       try {
-        const cached = sessionStorage.getItem('chimeraRelease');
-        const cachedAt = sessionStorage.getItem('chimeraReleaseAt');
+        const cached = sessionStorage.getItem('chimeraReleases');
+        const cachedAt = sessionStorage.getItem('chimeraReleasesAt');
         const now = Date.now();
         if (cached && cachedAt && (now - parseInt(cachedAt, 10)) < 300_000) {
-          window._chimeraRelease = JSON.parse(cached);
+          window._chimeraReleases = JSON.parse(cached);
         } else {
-          // Fetch all releases, filter out empty ones, pick newest with assets
+          // Fetch all releases, filter out empty ones, sort by date
           const res = await fetch('https://api.github.com/repos/LocalChimera/localchimera/releases?per_page=20');
           if (res.ok) {
             const releases = await res.json();
-            // Sort by creation date descending, pick first with assets
             const withAssets = releases
               .filter(r => r.assets && r.assets.length > 0)
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            const data = withAssets[0] || null;
-            if (data) {
-              window._chimeraRelease = data;
-              sessionStorage.setItem('chimeraRelease', JSON.stringify(data));
-              sessionStorage.setItem('chimeraReleaseAt', String(now));
-              // Show version in the note if OS was detected
-              const os = window._chimeraOS;
-              if (os && os !== 'unknown') {
-                const note = document.getElementById('osNote');
-                if (note) note.textContent = 'Detected ' + os + ' — v' + data.tag_name + '. Click to download.';
-              }
+            window._chimeraReleases = withAssets;
+            sessionStorage.setItem('chimeraReleases', JSON.stringify(withAssets));
+            sessionStorage.setItem('chimeraReleasesAt', String(now));
+            // Show version in the note if OS was detected
+            const os = window._chimeraOS;
+            if (os && os !== 'unknown' && withAssets.length > 0) {
+              const note = document.getElementById('osNote');
+              if (note) note.textContent = 'Detected ' + os + ' — v' + withAssets[0].tag_name + '. Click to download.';
             }
           }
         }
