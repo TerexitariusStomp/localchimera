@@ -61,21 +61,23 @@ async function runSingleAttempt() {
 
     // Capture early logcat to see app startup/crash
     try {
-      // Get the app PID
-      const pidOut = await browser.execute('mobile: shell', { command: 'pidof', args: ['io.chimera.mobile'] });
-      console.log('App PID:', pidOut);
+      // Get full logcat — we'll filter in JS
+      const earlyLogcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '-t', '5000'] });
+      const lines = (earlyLogcat || '').split('\n');
+      // Filter for app-related logs
+      const appLines = lines.filter(l => l.includes('chimera') || l.includes('ReactNative') || l.includes('com.facebook') || l.includes('SoLoader') || l.includes('Hermes') || l.includes('FATAL') || l.includes('qvac') || l.includes('AndroidRuntime'));
+      const appLogText = appLines.join('\n') || '(no app-related logs found)';
+      console.log('\n=== APP-RELATED LOGCAT ===');
+      console.log(appLogText);
+      console.log('=== END APP LOGCAT ===\n');
+      fs.writeFileSync(path.join(__dirname, 'logcat-app.txt'), appLogText);
 
-      // Get logcat filtered by app package
-      const earlyLogcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '--pid=' + (pidOut || '0'), '-t', '2000'] });
-      console.log('\n=== EARLY LOGCAT (app process) ===');
-      console.log(earlyLogcat || '(empty)');
-      console.log('=== END EARLY LOGCAT ===\n');
-
-      // Also get full logcat filtered for errors
-      const errorLogcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '*:E', '-t', '2000'] });
+      // Also get error-level logs
+      const errorLogcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '*:E', '-t', '1000'] });
       console.log('\n=== ERROR LOGCAT ===');
       console.log(errorLogcat || '(empty)');
       console.log('=== END ERROR LOGCAT ===\n');
+      fs.writeFileSync(path.join(__dirname, 'logcat-errors.txt'), errorLogcat || '(empty)');
     } catch (e) { console.log('Could not capture early logcat:', e.message); }
 
     // App now shows WebView immediately — no native setup screen

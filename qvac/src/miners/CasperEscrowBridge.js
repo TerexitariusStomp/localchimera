@@ -357,27 +357,66 @@ export class CasperEscrowBridge {
   }
 
   async runInference(prompt) {
-    if (!this.inferenceLayer) {
-      this.logger.warn('No inference layer available, returning mock result');
-      return { output: `Mock inference for: ${prompt}`, tokensGenerated: 0, durationMs: 0, fallback: true };
-    }
-
     this.logger.info(`Routing inference request: "${String(prompt).slice(0, 80)}..."`);
 
-    try {
-      const result = await this.inferenceLayer.handleInferenceRequest({
-        prompt: String(prompt),
-        maxTokens: 512,
-        temperature: 0.7,
-        source: 'casper-escrow',
-      });
-
-      this.logger.info(`Inference completed: ${result.success ? 'success' : 'failed'}`);
-      return result;
-    } catch (e) {
-      this.logger.error(`Inference error: ${e.message}`);
-      return { output: `Error: ${e.message}`, tokensGenerated: 0, durationMs: 0, fallback: true };
+    // Determine backend order from config or env
+    const backendPref = (this.config.inferenceBackend || process.env.CASPER_INFERENCE_BACKEND || 'auto').toLowerCase();
+    let backends;
+    if (backendPref === 'auto') {
+      backends = ['ollama', 'qvac'];
+    } else {
+      backends = backendPref.split(',').map(s => s.trim());
     }
+
+    for (const backend of backends) {
+      try {
+        if (backend === 'ollama') {
+          const result = await this._runOllama(prompt);
+          if (result) return result;
+        } else if (backend === 'qvac' && this.inferenceLayer) {
+          const result = await this.inferenceLayer.handleInferenceRequest({
+            prompt: String(prompt),
+            maxTokens: 512,
+            temperature: 0.7,
+            source: 'casper-escrow',
+          });
+          if (result && result.success && !result.fallback) {
+            this.logger.info(`Inference completed via QVAC`);
+            return result;
+          }
+          this.logger.warn(`QVAC returned fallback, trying next backend`);
+        }
+      } catch (e) {
+        this.logger.warn(`${backend} inference failed: ${e.message}`);
+      }
+    }
+
+    // Last resort fallback
+    this.logger.warn('All inference backends failed, returning fallback');
+    return { output: `Fallback inference for: ${prompt}`, success: true, fallback: true };
+  }
+
+  async _runOllama(prompt) {
+    const ollamaUrl = this.config.ollamaUrl || process.env.OLLAMA_URL || 'http://localhost:11434';
+    const ollamaModel = this.config.ollamaModel || process.env.OLLAMA_MODEL || 'llama3.2:1b';
+    this.logger.info(`Trying Ollama at ${ollamaUrl} (model: ${ollamaModel})`);
+
+    const res = await fetch(`${ollamaUrl}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: ollamaModel,
+        prompt: String(prompt),
+        stream: false,
+        options: { temperature: 0.7, num_predict: 512 },
+      }),
+    });
+    if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
+    const data = await res.json();
+    const output = (data.response || '').trim();
+    if (!output) throw new Error('Ollama returned empty response');
+    this.logger.info(`Ollama inference completed: ${output.slice(0, 100)}...`);
+    return { output, success: true, tokensGenerated: data.eval_count || 0, durationMs: data.total_duration || 0 };
   }
 
   computeHash(str) {

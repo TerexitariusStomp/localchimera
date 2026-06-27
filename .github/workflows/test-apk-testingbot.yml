@@ -75,5 +75,5 @@ jobs:
           name: testingbot-screenshots
           path: |
             scripts/screenshot-*.png
-            scripts/logcat.txt
+            scripts/logcat*.txt
             scripts/page-source*.xml
