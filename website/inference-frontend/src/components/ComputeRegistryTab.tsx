@@ -4,7 +4,7 @@ import { Button, Input, Card } from './ui';
 import { Send, Cpu, HardDrive, Monitor, RefreshCw, Users } from 'lucide-react';
 import type { TxRecord } from '../types';
 import * as sdk from 'casper-js-sdk';
-import { getMinimumStake } from '../casper-client';
+import { getMinimumStake, getRegisteredProviders } from '../casper-client';
 
 function modelToTaskTypeMask(model: string): number {
   if (model.includes('embedding')) return 2;
@@ -45,8 +45,13 @@ export default function ComputeRegistryTab({ provider, publicKeyHex, contractHas
   useEffect(() => {
     if (contractHash) {
       getMinimumStake(contractHash).then(v => setMinStakeMotes(v));
+      getRegisteredProviders(contractHash).then(setRegisteredProviders);
     }
   }, [contractHash]);
+
+  const refreshProviders = () => {
+    if (contractHash) getRegisteredProviders(contractHash).then(setRegisteredProviders);
+  };
 
   const minStakeCSPR = (Number(minStakeMotes) / 1e9).toFixed(4);
   const hasMinStake = Number(minStakeMotes) > 0;
@@ -78,6 +83,7 @@ export default function ComputeRegistryTab({ provider, publicKeyHex, contractHas
       <Card className="p-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-semibold flex items-center gap-2"><Users className="h-4 w-4" />Registered Providers</h3>
+          <button onClick={refreshProviders} className="text-xs text-[#00e5ff] hover:underline flex items-center gap-1"><RefreshCw className="h-3 w-3" />Refresh</button>
         </div>
         {registeredProviders.length === 0 ? (
           <p className="text-xs text-muted-foreground">No providers registered yet.</p>

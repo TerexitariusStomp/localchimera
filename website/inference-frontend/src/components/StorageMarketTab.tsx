@@ -1,22 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import EntryPointCard from './EntryPointCard';
-import { Button, Input, Card, Badge } from './ui';
-import { Send, HardDrive, Users, FileText, Shield, RefreshCw, Pause, Play, Trash2, CheckCircle } from 'lucide-react';
+import { Button, Input, StarRating } from './ui';
+import { Send, HardDrive, Shield, RefreshCw, Trash2, Star } from 'lucide-react';
 import type { TxRecord } from '../types';
 import * as sdk from 'casper-js-sdk';
 import { getContractNamedKeys, queryDictionary } from '../casper-client';
 
-function accountHashToBytes(hashStr: string): Uint8Array {
-  const bytes = new Uint8Array(32);
-  const hex = hashStr.replace('account-hash-', '');
-  for (let i = 0; i < 32; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
-  return bytes;
-}
+const ADMIN_PUBLIC_KEY = '020227d8dd5ccaa600e45b36e598d90ef8c26b6c67ef81bdfebde8fa583997a91ea5';
 
-export default function StorageMarketTab({ provider, publicKeyHex, contractHash, accountHash, onTx }: {
-  provider: any; publicKeyHex: string; contractHash: string; accountHash: string; onTx: (tx: TxRecord) => void;
+export default function StorageMarketTab({ provider, publicKeyHex, contractHash, accountHash, onTx, view = 'tasker' }: {
+  provider: any; publicKeyHex: string; contractHash: string; accountHash: string; onTx: (tx: TxRecord) => void; view?: 'tasker' | 'provider';
 }) {
   const canSign = !!provider && !!publicKeyHex;
+  const isAdmin = publicKeyHex === ADMIN_PUBLIC_KEY;
+  const isTasker = view === 'tasker';
+  const isProvider = view === 'provider';
   const [loading, setLoading] = useState(false);
   const [namedKeys, setNamedKeys] = useState<Record<string, string>>({});
   const [providersList, setProvidersList] = useState<any[]>([]);
@@ -111,71 +109,11 @@ export default function StorageMarketTab({ provider, publicKeyHex, contractHash,
         </button>
       </div>
 
-      {/* Providers */}
-      <Card className="p-4">
-        <h3 className="font-semibold flex items-center gap-2 mb-2"><Users className="h-4 w-4" />Storage Providers</h3>
-        {providersList.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No storage providers registered from this account.</p>
-        ) : (
-          <div className="space-y-2">
-            {providersList.map((p) => (
-              <div key={p.address} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
-                <div className="flex items-center gap-2">
-                  <span className={`inline-block h-2 w-2 rounded-full ${p.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                  <span className="font-medium">{p.name}</span>
-                </div>
-                <div className="text-muted-foreground">{p.capacity} MB · {(Number(p.price) / 1e9).toFixed(4)} CSPR/MB · {(Number(p.stake) / 1e9).toFixed(2)} CSPR staked</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Allocations */}
-      <Card className="p-4">
-        <h3 className="font-semibold flex items-center gap-2 mb-2"><FileText className="h-4 w-4" />Allocations</h3>
-        {allocations.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No allocations created.</p>
-        ) : (
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {allocations.map((a) => (
-              <div key={a.id} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
-                <div className="flex items-center gap-2">
-                  <Badge variant="default">{a.id}</Badge>
-                  <span>{a.sizeMb} MB · {a.dataShards}+{a.parityShards}</span>
-                </div>
-                <div className="text-muted-foreground">{(Number(a.amount) / 1e9).toFixed(4)} CSPR</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Files */}
-      <Card className="p-4">
-        <h3 className="font-semibold flex items-center gap-2 mb-2"><HardDrive className="h-4 w-4" />Stored Files</h3>
-        {files.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No files stored.</p>
-        ) : (
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {files.map((f) => (
-              <div key={f.id} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
-                <div className="flex items-center gap-2">
-                  <Badge variant={f.status === '1' ? 'success' : 'warning'}>{f.status === '1' ? 'confirmed' : 'pending'}</Badge>
-                  <span className="font-mono">{f.fileHash.slice(0, 20)}...</span>
-                </div>
-                <div className="text-muted-foreground">{f.sizeMb} MB</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Provider registration is automatic when the node starts */}
 
-        {/* Update Capacity */}
-        <EntryPointCard title="Update Capacity" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Update Capacity — provider only */}
+        {isProvider && (<EntryPointCard title="Update Capacity" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [capacity, setCapacity] = useState('10240');
             return <form onSubmit={(e) => { e.preventDefault(); submit('update_provider_capacity', {
@@ -187,38 +125,54 @@ export default function StorageMarketTab({ provider, publicKeyHex, contractHash,
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Create Allocation */}
-        <EntryPointCard title="Create Allocation" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Create Allocation — user-friendly: pick storage size + duration, redundancy auto-configured */}
+        {isTasker && (<EntryPointCard title="Get Storage Space" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
-            const [dataShards, setDataShards] = useState('3');
-            const [parityShards, setParityShards] = useState('1');
-            const [sizeMb, setSizeMb] = useState('100');
-            const [expiryMs, setExpiryMs] = useState(String(Date.now() + 30 * 24 * 60 * 60 * 1000));
+            const [sizeGb, setSizeGb] = useState('1');
+            const [durationDays, setDurationDays] = useState('30');
+            const [redundancy, setRedundancy] = useState('standard');
             const [amount, setAmount] = useState('10');
+            const sizeMb = Math.floor(parseFloat(sizeGb || '0') * 1024).toString();
+            const expiryMs = String(Date.now() + parseInt(durationDays || '30') * 24 * 60 * 60 * 1000);
+            const shardConfig: Record<string, { data: string; parity: string }> = {
+              standard: { data: '3', parity: '1' },
+              high: { data: '5', parity: '2' },
+              minimal: { data: '2', parity: '1' },
+            };
+            const shards = shardConfig[redundancy] || shardConfig.standard;
             const amountMotes = Math.floor(parseFloat(amount || '0') * 1e9).toString();
             return <form onSubmit={(e) => { e.preventDefault(); submit('create_allocation', {
-              data_shards: sdk.CLValue.newCLUInt64(dataShards),
-              parity_shards: sdk.CLValue.newCLUInt64(parityShards),
+              data_shards: sdk.CLValue.newCLUInt64(shards.data),
+              parity_shards: sdk.CLValue.newCLUInt64(shards.parity),
               size_mb: sdk.CLValue.newCLUInt64(sizeMb),
               expiry_ms: sdk.CLValue.newCLUInt64(expiryMs),
               amount: sdk.CLValue.newCLUInt512(amountMotes),
             }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Create a storage allocation with erasure coding.</div>
-              <div className="grid grid-cols-2 gap-2">
-                <Input label="Data Shards" value={dataShards} onChange={setDataShards} />
-                <Input label="Parity Shards" value={parityShards} onChange={setParityShards} />
+              <div className="text-xs text-muted-foreground">Reserve decentralized storage space. Files are split into encrypted shards and distributed across multiple providers.</div>
+              <Input label="Storage Size (GB)" value={sizeGb} onChange={setSizeGb} />
+              <Input label="Duration (days)" value={durationDays} onChange={setDurationDays} />
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Redundancy</label>
+                <div className="flex gap-2">
+                  {Object.entries(shardConfig).map(([key]) => (
+                    <button key={key} type="button" onClick={() => setRedundancy(key)}
+                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${redundancy === key ? 'bg-[#00e5ff]/15 border-[#00e5ff]/30 text-[#00e5ff]' : 'bg-white/5 border-white/10 text-[#7a7468] hover:bg-white/10'}`}>
+                      {key === 'standard' ? 'Standard (3+1)' : key === 'high' ? 'High (5+2)' : 'Minimal (2+1)'}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <Input label="Size (MB)" value={sizeMb} onChange={setSizeMb} />
-              <Input label="Expiry (timestamp ms)" value={expiryMs} onChange={setExpiryMs} />
               <Input label="Funds (CSPR)" value={amount} onChange={setAmount} />
-              <Button type="submit" disabled={!canSign} className="w-full"><Send className="h-4 w-4 mr-1" />Create Allocation</Button>
+              <Button type="submit" disabled={!canSign} className="w-full"><HardDrive className="h-4 w-4 mr-1" />Reserve Storage</Button>
             </form>;
           }}
         </EntryPointCard>
+        )}
 
         {/* Cancel Allocation */}
-        <EntryPointCard title="Cancel Allocation" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {isTasker && (<EntryPointCard title="Cancel Allocation" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [allocId, setAllocId] = useState('');
             return <form onSubmit={(e) => { e.preventDefault(); submit('cancel_allocation', {
@@ -230,50 +184,44 @@ export default function StorageMarketTab({ provider, publicKeyHex, contractHash,
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Store File */}
-        <EntryPointCard title="Store File" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Store File — simplified: pick allocation, upload file, provider auto-assigned */}
+        {isTasker && (<EntryPointCard title="Store File" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [allocId, setAllocId] = useState('');
             const [fileHash, setFileHash] = useState('');
             const [sizeMb, setSizeMb] = useState('1');
-            const [providerAddr, setProviderAddr] = useState('');
-            const [amount, setAmount] = useState('1');
-            const amountMotes = Math.floor(parseFloat(amount || '0') * 1e9).toString();
+            const amountMotes = Math.floor(parseFloat('1') * 1e9).toString();
+            const activeAllocations = allocations.filter(a => a.status === '0' || a.status === '1');
             return <form onSubmit={(e) => { e.preventDefault(); submit('store_file', {
               alloc_id: sdk.CLValue.newCLString(allocId),
               file_hash: sdk.CLValue.newCLString(fileHash),
               size_mb: sdk.CLValue.newCLUInt64(sizeMb),
-              provider: sdk.CLValue.newCLByteArray(accountHashToBytes(providerAddr.replace('account-hash-', ''))),
               amount: sdk.CLValue.newCLUInt512(amountMotes),
             }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Store a file with a specific provider.</div>
-              <Input label="Allocation ID" value={allocId} onChange={setAllocId} />
-              <Input label="File Hash (IPFS/content hash)" value={fileHash} onChange={setFileHash} />
-              <Input label="Size (MB)" value={sizeMb} onChange={setSizeMb} />
-              <Input label="Provider Account Hash" value={providerAddr} onChange={setProviderAddr} placeholder="account-hash-..." />
-              <Input label="Payment (CSPR)" value={amount} onChange={setAmount} />
+              <div className="text-xs text-muted-foreground">Upload a file to your storage allocation. The system automatically assigns suitable providers and handles shard distribution.</div>
+              {activeAllocations.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {activeAllocations.map(a => (
+                    <button key={a.id} type="button" onClick={() => setAllocId(a.id)}
+                      className={`text-[10px] px-2 py-1 rounded font-mono ${allocId === a.id ? 'bg-[#00e5ff]/20 text-[#00e5ff]' : 'bg-white/5 text-[#7a7468] hover:bg-white/10'}`}>
+                      {a.id} ({a.sizeMb} MB)
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Input label="Allocation ID" value={allocId} onChange={setAllocId} placeholder="alloc-0" />
+              <Input label="File Hash (IPFS/content hash)" value={fileHash} onChange={setFileHash} placeholder="Qm..." />
+              <Input label="File Size (MB)" value={sizeMb} onChange={setSizeMb} />
               <Button type="submit" disabled={!canSign || !allocId.trim() || !fileHash.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Store File</Button>
             </form>;
           }}
         </EntryPointCard>
-
-        {/* Confirm Storage */}
-        <EntryPointCard title="Confirm Storage" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [fileId, setFileId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('confirm_storage', {
-              file_id: sdk.CLValue.newCLString(fileId),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><CheckCircle className="h-3 w-3" />Provider confirms file is stored.</div>
-              <Input label="File ID" value={fileId} onChange={setFileId} />
-              <Button type="submit" disabled={!canSign || !fileId.trim()} className="w-full"><CheckCircle className="h-4 w-4 mr-1" />Confirm</Button>
-            </form>;
-          }}
-        </EntryPointCard>
+        )}
 
         {/* Remove File */}
-        <EntryPointCard title="Remove File" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {isTasker && (<EntryPointCard title="Remove File" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [fileId, setFileId] = useState('');
             return <form onSubmit={(e) => { e.preventDefault(); submit('remove_file', {
@@ -285,95 +233,113 @@ export default function StorageMarketTab({ provider, publicKeyHex, contractHash,
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Issue Challenge */}
-        <EntryPointCard title="Issue Challenge" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Rate Provider — consumer rates the storage provider after file is confirmed */}
+        {isTasker && (<EntryPointCard title="Rate Provider" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [fileId, setFileId] = useState('');
-            const [challengeHash, setChallengeHash] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('issue_challenge', {
+            const [rating, setRating] = useState(0);
+            const confirmedFiles = files.filter(f => f.status === '1');
+            return <form onSubmit={(e) => { e.preventDefault(); submit('rate_provider', {
               file_id: sdk.CLValue.newCLString(fileId),
-              challenge_hash: sdk.CLValue.newCLString(challengeHash),
+              rating: sdk.CLValue.newCLUint64(String(rating)),
             }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><Shield className="h-3 w-3" />Issue a storage proof challenge.</div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1"><Star className="h-3 w-3 text-[#00e5ff]" />Rate the storage provider after file confirmation. Recorded on-chain.</div>
+              {confirmedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {confirmedFiles.map(f => (
+                    <button key={f.id} type="button" onClick={() => setFileId(f.id)}
+                      className={`text-[10px] px-2 py-1 rounded font-mono ${fileId === f.id ? 'bg-[#00e5ff]/20 text-[#00e5ff]' : 'bg-white/5 text-[#7a7468] hover:bg-white/10'}`}>
+                      {f.id}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Input label="File ID" value={fileId} onChange={setFileId} />
-              <Input label="Challenge Hash" value={challengeHash} onChange={setChallengeHash} />
-              <Button type="submit" disabled={!canSign || !fileId.trim()} className="w-full"><Shield className="h-4 w-4 mr-1" />Issue Challenge</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Respond Challenge */}
-        <EntryPointCard title="Respond to Challenge" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [challengeId, setChallengeId] = useState('');
-            const [responseHash, setResponseHash] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('respond_challenge', {
-              challenge_id: sdk.CLValue.newCLString(challengeId),
-              response_hash: sdk.CLValue.newCLString(responseHash),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Provider responds to a storage challenge.</div>
-              <Input label="Challenge ID" value={challengeId} onChange={setChallengeId} />
-              <Input label="Response Hash" value={responseHash} onChange={setResponseHash} />
-              <Button type="submit" disabled={!canSign || !challengeId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Respond</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Verify Challenge */}
-        <EntryPointCard title="Verify Challenge" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [challengeId, setChallengeId] = useState('');
-            const [passed, setPassed] = useState(true);
-            return <form onSubmit={(e) => { e.preventDefault(); submit('verify_challenge', {
-              challenge_id: sdk.CLValue.newCLString(challengeId),
-              passed: sdk.CLValue.newCLBool(passed),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Verify a challenge response (admin/verifier).</div>
-              <Input label="Challenge ID" value={challengeId} onChange={setChallengeId} />
-              <div className="flex items-center gap-2">
-                <label className="text-sm flex items-center gap-2">
-                  <input type="checkbox" checked={passed} onChange={(e) => setPassed(e.target.checked)} className="rounded" />
-                  Challenge Passed
-                </label>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Provider Rating</label>
+                <StarRating value={rating} onChange={setRating} />
               </div>
-              <Button type="submit" disabled={!canSign || !challengeId.trim()} className="w-full"><CheckCircle className="h-4 w-4 mr-1" />Verify</Button>
+              <Button type="submit" disabled={!canSign || !fileId.trim() || rating === 0} className="w-full"><Star className="h-4 w-4 mr-1" />Rate Provider</Button>
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Claim Storage Payment */}
-        <EntryPointCard title="Claim Storage Payment" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Rate Consumer — provider rates the consumer after payment is received */}
+        {isProvider && (<EntryPointCard title="Rate Consumer" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [fileId, setFileId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('claim_storage_payment', {
+            const [rating, setRating] = useState(0);
+            const confirmedFiles = files.filter(f => f.status === '1');
+            return <form onSubmit={(e) => { e.preventDefault(); submit('rate_consumer', {
               file_id: sdk.CLValue.newCLString(fileId),
+              rating: sdk.CLValue.newCLUint64(String(rating)),
             }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Claim payment for confirmed storage (provider).</div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1"><Star className="h-3 w-3 text-[#00e5ff]" />Rate the consumer after storage payment. Recorded on-chain.</div>
+              {confirmedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {confirmedFiles.map(f => (
+                    <button key={f.id} type="button" onClick={() => setFileId(f.id)}
+                      className={`text-[10px] px-2 py-1 rounded font-mono ${fileId === f.id ? 'bg-[#00e5ff]/20 text-[#00e5ff]' : 'bg-white/5 text-[#7a7468] hover:bg-white/10'}`}>
+                      {f.id}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Input label="File ID" value={fileId} onChange={setFileId} />
-              <Button type="submit" disabled={!canSign || !fileId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Claim Payment</Button>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Consumer Rating</label>
+                <StarRating value={rating} onChange={setRating} />
+              </div>
+              <Button type="submit" disabled={!canSign || !fileId.trim() || rating === 0} className="w-full"><Star className="h-4 w-4 mr-1" />Rate Consumer</Button>
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Pause/Resume */}
-        <EntryPointCard title="Pause Provider" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => (
-            <form onSubmit={(e) => { e.preventDefault(); submit('pause_provider', {}); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><Pause className="h-3 w-3" />Stop accepting storage requests.</div>
-              <Button type="submit" disabled={!canSign} variant="danger" className="w-full"><Pause className="h-4 w-4 mr-1" />Pause</Button>
-            </form>
-          )}
-        </EntryPointCard>
+        {/* Admin only: Issue Challenge + Verify Challenge */}
+        {isProvider && isAdmin && (
+          <EntryPointCard title="Issue Challenge (Admin)" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+            {({ submit }) => {
+              const [fileId, setFileId] = useState('');
+              const [challengeHash, setChallengeHash] = useState('');
+              return <form onSubmit={(e) => { e.preventDefault(); submit('issue_challenge', {
+                file_id: sdk.CLValue.newCLString(fileId),
+                challenge_hash: sdk.CLValue.newCLString(challengeHash),
+              }); }} className="space-y-2">
+                <div className="text-xs text-muted-foreground flex items-center gap-1"><Shield className="h-3 w-3 text-[#00e5ff]" />Issue a storage proof challenge (admin only).</div>
+                <Input label="File ID" value={fileId} onChange={setFileId} />
+                <Input label="Challenge Hash" value={challengeHash} onChange={setChallengeHash} />
+                <Button type="submit" disabled={!canSign || !fileId.trim()} variant="outline" className="w-full"><Shield className="h-4 w-4 mr-1" />Issue Challenge</Button>
+              </form>;
+            }}
+          </EntryPointCard>
+        )}
 
-        <EntryPointCard title="Resume Provider" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => (
-            <form onSubmit={(e) => { e.preventDefault(); submit('resume_provider', {}); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><Play className="h-3 w-3" />Resume accepting storage.</div>
-              <Button type="submit" disabled={!canSign} className="w-full"><Play className="h-4 w-4 mr-1" />Resume</Button>
-            </form>
-          )}
-        </EntryPointCard>
+        {isProvider && isAdmin && (
+          <EntryPointCard title="Verify Challenge (Admin)" contract="StorageMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+            {({ submit }) => {
+              const [challengeId, setChallengeId] = useState('');
+              const [passed, setPassed] = useState(true);
+              return <form onSubmit={(e) => { e.preventDefault(); submit('verify_challenge', {
+                challenge_id: sdk.CLValue.newCLString(challengeId),
+                passed: sdk.CLValue.newCLBool(passed),
+              }); }} className="space-y-2">
+                <div className="text-xs text-muted-foreground flex items-center gap-1"><Shield className="h-3 w-3 text-[#00e5ff]" />Verify a challenge response (admin only).</div>
+                <Input label="Challenge ID" value={challengeId} onChange={setChallengeId} />
+                <div className="flex items-center gap-2">
+                  <label className="text-sm flex items-center gap-2">
+                    <input type="checkbox" checked={passed} onChange={(e) => setPassed(e.target.checked)} className="rounded" />
+                    Challenge Passed
+                  </label>
+                </div>
+                <Button type="submit" disabled={!canSign || !challengeId.trim()} variant="outline" className="w-full">Verify</Button>
+              </form>;
+            }}
+          </EntryPointCard>
+        )}
       </div>
     </div>
   );

@@ -1,0 +1,18 @@
+{
+  "network": "casper-test",
+  "rpcUrl": "https://node.testnet.casper.network/rpc",
+  "deployedAt": "2026-06-26T03:37:20.467Z",
+  "deployerAccount": "account-hash-adc9f9681f0b1b27862dad47a0ac06f89dd8ff72d944e429dbaf0468b62f1da2",
+  "contracts": {
+    "inferenceMarket": "hash-663812cfe4103b9d1584e3caccf7be9188e4c6c5f77851dacb64b8f308947f82",
+    "storageMarket": "hash-1e884efc1a97e698149b91e5ffb7d1e8cda85598a4db75ac5b3be379418a2dca",
+    "computeMarket": "hash-c1e96f072f632d681106d367cd34b4ec9d86258f10106c2cb9dcf23306c53af8",
+    "bandwidthMarket": "hash-4361a385408288194b54c7297e7f1754833f31a2ae88f3d1c5eabee4798897a1"
+  },
+  "deployHashes": {
+    "inferenceMarket": "4d98c92d2e114a1f74c74618c9c0861cdf6ebfbdb128f2a41baec3ce851e95ff",
+    "storageMarket": "7a2c65cc78e25f4f3d7b99663e37b7bd3fced85a6c8bee830a3b6295d6089863",
+    "computeMarket": "a17d99de04daa39f72dc8cff7b5b8fd6d869d6fdf0033fcd1b13c3a174de4b3a",
+    "bandwidthMarket": "ea5b225ea669e4ae63b349a2b147fa39f04479ccb5534172c1497590d2725e44"
+  }
+}

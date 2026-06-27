@@ -15,11 +15,12 @@ const __dirname = dirname(__filename);
 
 const CHAIN_NAME = 'casper-test';
 const RPC_URL = 'https://node.testnet.casper.network/rpc';
-const PAYMENT = '50000000000';
+const PAYMENT = '500000000000'; // 500 CSPR
 const WASM_DIR = join(__dirname, '../contracts-casper/target/wasm32-unknown-unknown/release');
+const NOBULK_DIR = join(__dirname, '../contracts-casper/target/wasm32-unknown-unknown/release');
 
 function loadKey(): any {
-  const pemPath = process.env.CSPR_PEM_PATH || '/tmp/casper-keys/Account 1_secret_key.pem';
+  const pemPath = process.env.CSPR_PEM_PATH || '/tmp/casper-wallet/Account 7_secret_key.pem';
   const pem = readFileSync(pemPath, 'utf-8');
   return sdk.PrivateKey.fromPem(pem, sdk.KeyAlgorithm.SECP256K1);
 }
@@ -80,7 +81,7 @@ async function deployContract(
   key: any,
   args: any,
 ): Promise<string> {
-  const wasmPath = join(WASM_DIR, `${name}.wasm`);
+  const wasmPath = join(WASM_DIR, `${name}_nobulk.wasm`);
   const wasmBytes = readFileSync(wasmPath);
   const session = sdk.ExecutableDeployItem.newModuleBytes(wasmBytes, args);
 

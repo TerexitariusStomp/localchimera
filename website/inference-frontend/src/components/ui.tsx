@@ -1,15 +1,17 @@
+import { useState } from 'react';
+import { Star } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn('rounded-lg border bg-card text-card-foreground shadow-sm', className)}>{children}</div>;
+  return <div className={cn('rounded-2xl border border-white/[0.06] bg-white/[0.015] text-card-foreground transition-all hover:border-white/[0.12] hover:bg-white/[0.03] hover:-translate-y-0.5', className)}>{children}</div>;
 }
 
 export function Button({ children, onClick, disabled, variant = 'primary', className, type = 'button' }: any) {
   const variants: any = {
-    primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
-    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/90',
+    primary: 'bg-gradient-to-br from-[#00e5ff] to-[#a855f7] text-black font-semibold hover:opacity-90',
+    secondary: 'bg-white/[0.06] border border-white/10 text-[#e8e2d8] hover:bg-white/10',
     danger: 'bg-red-600 text-white hover:bg-red-700',
-    outline: 'border bg-background hover:bg-accent hover:text-accent-foreground',
+    outline: 'border border-white/10 bg-transparent text-[#e8e2d8] hover:bg-white/5',
   };
   return (
     <button type={type} onClick={onClick} disabled={disabled}
@@ -47,4 +49,21 @@ export function Badge({ children, variant = 'default' }: any) {
     warning: 'bg-yellow-500/10 text-yellow-400',
   };
   return <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border border-white/5', variants[variant])}>{children}</span>;
+}
+
+export function StarRating({ value, onChange, size = 20 }: { value: number; onChange: (v: number) => void; size?: number }) {
+  const [hover, setHover] = useState(0);
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button key={star} type="button" onClick={() => onChange(star)}
+          onMouseEnter={() => setHover(star)} onMouseLeave={() => setHover(0)}
+          className="transition-transform hover:scale-110">
+          <Star size={size}
+            className={(hover || value) >= star ? 'fill-[#00e5ff] text-[#00e5ff]' : 'fill-none text-white/20'} />
+        </button>
+      ))}
+      <span className="ml-2 text-sm text-muted-foreground">{value > 0 ? `${value}/5` : 'Not rated'}</span>
+    </div>
+  );
 }

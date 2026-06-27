@@ -4,10 +4,12 @@ import { WebView } from 'react-native-webview';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system';
 import { loadModel, completion, BITNET_0_7B_INST_TQ2_0 } from '@qvac/sdk';
+import assetModules from './generated-asset-requires';
 
 export default function App() {
   const [modelStatus, setModelStatus] = useState('idle');
-  const [frontendUri, setFrontendUri] = useState(null);
+  const [frontendHtml, setFrontendHtml] = useState(null);
+  const [frontendBaseUri, setFrontendBaseUri] = useState(null);
   const [modelId, setModelId] = useState(null);
   const [modelError, setModelError] = useState(null);
   const [walletAddress, setWalletAddress] = useState(null);
@@ -22,11 +24,34 @@ export default function App() {
   useEffect(() => {
     async function initFrontend() {
       try {
-        const asset = await Asset.fromModule(require('./assets/frontend/index.html'));
-        setFrontendUri(asset.localUri || asset.uri);
+        // Create a local directory to hold all frontend files with proper structure
+        const localDir = FileSystem.cacheDirectory + 'frontend/';
+        await FileSystem.makeDirectoryAsync(localDir, { intermediates: true });
+
+        // Load and copy the main HTML file
+        const htmlAsset = await Asset.fromModule(require('./assets/frontend/index.html'));
+        const htmlUri = htmlAsset.localUri || htmlAsset.uri;
+        const html = await FileSystem.readAsStringAsync(htmlUri);
+
+        // Load all asset files and copy them to localDir preserving structure
+        const assetEntries = Object.entries(assetModules);
+        await Promise.all(assetEntries.map(async ([relPath, mod]) => {
+          const asset = await Asset.fromModule(mod);
+          const srcUri = asset.localUri || asset.uri;
+          const destUri = localDir + relPath;
+          const destDir = destUri.substring(0, destUri.lastIndexOf('/'));
+          await FileSystem.makeDirectoryAsync(destDir, { intermediates: true });
+          await FileSystem.copyAsync({ from: srcUri, to: destUri });
+        }));
+
+        // Write HTML to localDir
+        await FileSystem.writeAsStringAsync(localDir + 'index.html', html);
+
+        setFrontendHtml(html);
+        setFrontendBaseUri(localDir);
       } catch (e) {
         console.error('Frontend load error:', e);
-        setFrontendUri('');
+        setFrontendHtml('');
       }
     }
     initFrontend();
@@ -713,7 +738,7 @@ export default function App() {
     })();
   `;
 
-  if (!frontendUri) {
+  if (!frontendHtml) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#00e5ff" />
@@ -722,7 +747,7 @@ export default function App() {
     );
   }
 
-  if (frontendUri === '') {
+  if (frontendHtml === '') {
     return (
       <View style={styles.container}>
         <Text style={[styles.text, { color: '#ff6b6b' }]}>Failed to load frontend assets</Text>
@@ -734,7 +759,7 @@ export default function App() {
     <View style={styles.container}>
       <WebView
         ref={webViewRef}
-        source={{ uri: frontendUri }}
+        source={{ html: frontendHtml, baseUrl: frontendBaseUri }}
         style={styles.webview}
         injectedJavaScript={injectedBridge}
         onMessage={handleWebViewMessage}

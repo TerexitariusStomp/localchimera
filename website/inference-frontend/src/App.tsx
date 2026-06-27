@@ -1,33 +1,28 @@
 import { useState, useCallback, useEffect } from 'react';
-import { queryContractNamedKeys, CONTRACTS } from './casper-client';
+import { CONTRACTS } from './casper-client';
 import { connectWallet, disconnectWallet, isWalletInstalled } from './casper-wallet';
 import { Wallet } from 'lucide-react';
-import { Button, Badge } from './components/ui';
-import OverviewTab from './components/OverviewTab';
+import { Button } from './components/ui';
 import InferenceMarketTab from './components/InferenceMarketTab';
 import StorageMarketTab from './components/StorageMarketTab';
 import ComputeMarketTab from './components/ComputeMarketTab';
 import BandwidthMarketTab from './components/BandwidthMarketTab';
+import MarketTab from './components/MarketTab';
+import MachinesTab from './components/MachinesTab';
+import CompletedTab from './components/CompletedTab';
+import TaskerTab from './components/TaskerTab';
+import ProviderTab from './components/ProviderTab';
 import type { TxRecord } from './types';
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 mb-4">
-      <div className="h-px flex-1 bg-white/5" />
-      <h2 className="text-sm font-semibold tracking-wide uppercase text-[#7a7468]">{children}</h2>
-      <div className="h-px flex-1 bg-white/5" />
-    </div>
-  );
-}
+type Page = 'market' | 'machines' | 'completed' | 'tasker' | 'provider';
 
 export default function App() {
   const [provider, setProvider] = useState<any>(null);
   const [publicKeyHex, setPublicKeyHex] = useState('');
   const [accountHash, setAccountHash] = useState('');
-  const [txHistory, setTxHistory] = useState<TxRecord[]>([]);
-  const [contractKeys, setContractKeys] = useState<Record<string, { name: string; key: string }[]>>({});
   const [walletError, setWalletError] = useState('');
   const [walletDetected, setWalletDetected] = useState(false);
+  const [page, setPage] = useState<Page>('tasker');
 
   useEffect(() => {
     // Poll for Casper Wallet since extensions inject asynchronously
@@ -45,11 +40,6 @@ export default function App() {
       setPublicKeyHex(res.publicKey);
       const pk = (await import('casper-js-sdk')).PublicKey.fromHex(res.publicKey);
       setAccountHash(pk.accountHash().toPrefixedString());
-      Object.entries(CONTRACTS).forEach(([name, hash]) => {
-        queryContractNamedKeys(hash).then((keys) => {
-          setContractKeys((prev) => ({ ...prev, [name]: keys }));
-        }).catch(() => {});
-      });
     } else {
       setWalletError('Could not connect to Casper Wallet. Make sure the extension is installed and unlocked.');
     }
@@ -57,16 +47,10 @@ export default function App() {
 
   const disconnect = useCallback(async () => {
     await disconnectWallet();
-    setProvider(null); setPublicKeyHex(''); setAccountHash(''); setContractKeys({}); setWalletError('');
+    setProvider(null); setPublicKeyHex(''); setAccountHash(''); setWalletError('');
   }, []);
 
-  const updateTx = useCallback((tx: TxRecord) => {
-    setTxHistory((prev) => {
-      const existing = prev.find((t) => t.deployHash === tx.deployHash);
-      if (existing) return prev.map((t) => (t.deployHash === tx.deployHash ? { ...t, ...tx } : t));
-      return [tx, ...prev];
-    });
-  }, []);
+  const updateTx = useCallback((_tx: TxRecord) => {}, []);
 
   const isConnected = !!provider && !!publicKeyHex;
 
@@ -84,28 +68,25 @@ export default function App() {
           </a>
           {/* Navigation Tabs */}
           <nav className="hidden md:flex items-center gap-1">
-            <a href="/"
-              className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white/5 hover:text-[#00e5ff] text-[#7a7468]">
-              Home
-            </a>
-            {[
-              { id: 'inference', label: 'Inference' },
-              { id: 'storage', label: 'Storage' },
-              { id: 'compute', label: 'Compute' },
-              { id: 'bandwidth', label: 'Bandwidth' },
-              { id: 'overview', label: 'Network Status' },
-            ].map((tab) => (
-              <a key={tab.id} href={`#${tab.id}`}
-                className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white/5 hover:text-[#00e5ff] text-[#7a7468]">
+            {([
+              { id: 'tasker', label: 'Tasker' },
+              { id: 'provider', label: 'Provider' },
+              { id: 'market', label: 'Market' },
+              { id: 'machines', label: 'Machines' },
+              { id: 'completed', label: 'Completed' },
+            ] as { id: Page; label: string }[]).map((tab) => (
+              <button key={tab.id} onClick={() => setPage(tab.id)}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${page === tab.id ? 'bg-white/5 text-[#00e5ff]' : 'hover:bg-white/5 hover:text-[#00e5ff] text-[#7a7468]'}`}>
                 {tab.label}
-              </a>
+              </button>
             ))}
           </nav>
+          {/* Wallet controls */}
           <div className="flex items-center gap-3">
             {isConnected ? (
               <>
                 <div className="text-right">
-                  <div className="text-[10px] font-mono text-[#7a7468]">{accountHash.slice(0, 14)}...{accountHash.slice(-6)}</div>
+                  <div className="text-[10px] font-mono text-[#7a7468]">{accountHash.replace('account-hash-', '').slice(0, 14)}...{accountHash.slice(-6)}</div>
                 </div>
                 <Button variant="outline" onClick={disconnect} className="text-[10px] h-7 px-2 border-white/10 hover:bg-white/5">Disconnect</Button>
               </>
@@ -122,74 +103,34 @@ export default function App() {
       {/* Spacer for fixed header */}
       <div className="h-16" />
 
-      {/* Main Content — Single Page with all sections */}
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-10">
+      {/* Main Content — single active page */}
+      <main className="max-w-5xl mx-auto px-6 py-8">
         {!walletDetected && !isConnected && (
-          <div className="space-y-3">
-            <div className="text-sm text-red-400 bg-red-500/5 border border-red-500/10 p-3 rounded-lg">
-              <strong>Casper Wallet extension not detected.</strong>
-              <a href="https://chromewebstore.google.com/detail/casper-wallet/" target="_blank" rel="noopener noreferrer" className="underline ml-1 text-[#00e5ff]">Install it here</a>.
-            </div>
+          <div className="mb-6 text-sm text-red-400 bg-red-500/5 border border-red-500/10 p-3 rounded-lg">
+            <strong>Casper Wallet extension not detected.</strong>
+            <a href="https://chromewebstore.google.com/detail/casper-wallet/" target="_blank" rel="noopener noreferrer" className="underline ml-1 text-[#00e5ff]">Install it here</a>.
           </div>
         )}
 
-        {walletDetected && !isConnected && (
-          <div className="text-sm text-green-400 bg-green-500/5 border border-green-500/10 p-3 rounded-lg">
-            <strong>Casper Wallet detected.</strong> Click <strong>Connect</strong> in the header to sign in.
-          </div>
+        {page === 'market' && (
+          <MarketTab />
         )}
 
-        {/* Inference Market */}
-        <section id="inference" className="space-y-4">
-          <SectionTitle>Inference Market</SectionTitle>
-          <InferenceMarketTab provider={provider} publicKeyHex={publicKeyHex} contractHash={CONTRACTS.inferenceMarket} accountHash={accountHash} onTx={updateTx} />
-        </section>
+        {page === 'machines' && (
+          <MachinesTab />
+        )}
 
-        {/* Storage Market */}
-        <section id="storage" className="space-y-4">
-          <SectionTitle>Storage Market</SectionTitle>
-          <StorageMarketTab provider={provider} publicKeyHex={publicKeyHex} contractHash={CONTRACTS.storageMarket} accountHash={accountHash} onTx={updateTx} />
-        </section>
+        {page === 'completed' && (
+          <CompletedTab />
+        )}
 
-        {/* Compute Market */}
-        <section id="compute" className="space-y-4">
-          <SectionTitle>Compute Market</SectionTitle>
-          <ComputeMarketTab provider={provider} publicKeyHex={publicKeyHex} contractHash={CONTRACTS.computeMarket} accountHash={accountHash} onTx={updateTx} />
-        </section>
+        {page === 'tasker' && (
+          <TaskerTab provider={provider} publicKeyHex={publicKeyHex} accountHash={accountHash} onTx={updateTx} />
+        )}
 
-        {/* Bandwidth Market */}
-        <section id="bandwidth" className="space-y-4">
-          <SectionTitle>Bandwidth Market</SectionTitle>
-          <BandwidthMarketTab provider={provider} publicKeyHex={publicKeyHex} contractHash={CONTRACTS.bandwidthMarket} accountHash={accountHash} onTx={updateTx} />
-        </section>
-
-        {/* Overview */}
-        <section id="overview" className="space-y-4">
-          <SectionTitle>Network Status</SectionTitle>
-          <OverviewTab contractKeys={contractKeys} txHistory={txHistory} publicKeyStr={publicKeyHex} accountHash={accountHash} />
-        </section>
-
-        {/* Recent Transactions */}
-        <section id="transactions" className="space-y-3">
-          <SectionTitle>Recent Transactions</SectionTitle>
-          {txHistory.length === 0 ? <p className="text-sm text-[#7a7468]">No transactions yet</p> : (
-            <div className="space-y-2">
-              {txHistory.slice(0, 10).map((tx) => (
-                <div key={tx.id} className="flex items-center justify-between text-xs bg-white/[0.03] border border-white/5 p-3 rounded-lg hover:bg-white/[0.05] transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div>
-                      <div className="font-medium text-[#e8e2d8]">{tx.contract} :: {tx.entryPoint}</div>
-                      <a href={`https://testnet.cspr.live/deploy/${tx.deployHash}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[#7a7468] hover:text-[#00e5ff] transition-colors">
-                        {tx.deployHash}
-                      </a>
-                    </div>
-                  </div>
-                  <Badge variant={tx.status === 'success' ? 'success' : tx.status === 'error' ? 'error' : 'warning'}>{tx.status}</Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        {page === 'provider' && (
+          <ProviderTab provider={provider} publicKeyHex={publicKeyHex} accountHash={accountHash} onTx={updateTx} />
+        )}
       </main>
 
       {/* Footer */}

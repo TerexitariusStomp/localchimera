@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import EntryPointCard from './EntryPointCard';
-import { Button, Input, Card, Badge } from './ui';
-import { Send, Cpu, Users, FileText, RefreshCw, Pause, Play, Gavel, CheckCircle, XCircle, DollarSign } from 'lucide-react';
+import { Button, Input, StarRating } from './ui';
+import { Send, Cpu, RefreshCw, Star } from 'lucide-react';
 import type { TxRecord } from '../types';
 import * as sdk from 'casper-js-sdk';
 import { getContractNamedKeys, queryDictionary } from '../casper-client';
@@ -10,10 +10,12 @@ const AGREEMENT_STATUS: Record<string, string> = {
   '0': 'pending', '1': 'approved', '2': 'rejected', '3': 'active', '4': 'terminated',
 };
 
-export default function ComputeMarketTab({ provider, publicKeyHex, contractHash, accountHash, onTx }: {
-  provider: any; publicKeyHex: string; contractHash: string; accountHash: string; onTx: (tx: TxRecord) => void;
+export default function ComputeMarketTab({ provider, publicKeyHex, contractHash, accountHash, onTx, view = 'tasker' }: {
+  provider: any; publicKeyHex: string; contractHash: string; accountHash: string; onTx: (tx: TxRecord) => void; view?: 'tasker' | 'provider';
 }) {
   const canSign = !!provider && !!publicKeyHex;
+  const isTasker = view === 'tasker';
+  const isProvider = view === 'provider';
   const [loading, setLoading] = useState(false);
   const [namedKeys, setNamedKeys] = useState<Record<string, string>>({});
   const [providersList, setProvidersList] = useState<any[]>([]);
@@ -113,75 +115,11 @@ export default function ComputeMarketTab({ provider, publicKeyHex, contractHash,
         </button>
       </div>
 
-      {/* Providers */}
-      <Card className="p-4">
-        <h3 className="font-semibold flex items-center gap-2 mb-2"><Users className="h-4 w-4" />Compute Providers</h3>
-        {providersList.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No compute providers registered from this account.</p>
-        ) : (
-          <div className="space-y-2">
-            {providersList.map((p) => (
-              <div key={p.address} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
-                <div className="flex items-center gap-2">
-                  <span className={`inline-block h-2 w-2 rounded-full ${p.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                  <span className="font-medium">{p.name}</span>
-                  <span>{p.cpuCores} cores · {p.ramMb} MB RAM</span>
-                  {p.hasGpu && <Badge variant="warning">GPU {p.vramMb}MB</Badge>}
-                </div>
-                <div className="text-muted-foreground">{(Number(p.pricePerCpu) / 1e9).toFixed(4)} CSPR/CPU·s · {(Number(p.stake) / 1e9).toFixed(2)} CSPR</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Demands */}
-      <Card className="p-4">
-        <h3 className="font-semibold flex items-center gap-2 mb-2"><FileText className="h-4 w-4" />Open Demands</h3>
-        {demands.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No compute demands created.</p>
-        ) : (
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {demands.map((d) => (
-              <div key={d.id} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
-                <div className="flex items-center gap-2">
-                  <Badge variant="default">{d.id}</Badge>
-                  <span>{d.taskType} · {d.runtime}</span>
-                  {d.requiresGpu && <Badge variant="warning">GPU</Badge>}
-                </div>
-                <div className="text-muted-foreground">{d.duration}s · {(Number(d.maxCost) / 1e9).toFixed(4)} CSPR max</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Agreements */}
-      <Card className="p-4">
-        <h3 className="font-semibold flex items-center gap-2 mb-2"><Gavel className="h-4 w-4" />Agreements</h3>
-        {agreements.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No agreements created.</p>
-        ) : (
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {agreements.map((a) => (
-              <div key={a.id} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
-                <div className="flex items-center gap-2">
-                  <Badge variant={a.status === 'active' ? 'success' : a.status === 'terminated' ? 'error' : 'warning'}>{a.status}</Badge>
-                  <span className="font-mono">{a.id}</span>
-                  <span className="text-muted-foreground">{a.demandId} ← {a.offerId}</span>
-                </div>
-                <div className="text-muted-foreground">{(Number(a.amount) / 1e9).toFixed(4)} CSPR</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Provider registration is automatic when the node starts */}
 
-        {/* Update Offer */}
-        <EntryPointCard title="Update Pricing" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Update Offer — provider only */}
+        {isProvider && (<EntryPointCard title="Update Pricing" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [pricePerCpu, setPricePerCpu] = useState('0.01');
             const [pricePerGpu, setPricePerGpu] = useState('0.1');
@@ -198,9 +136,10 @@ export default function ComputeMarketTab({ provider, publicKeyHex, contractHash,
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Create Demand */}
-        <EntryPointCard title="Create Compute Demand" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Create Demand — tasker only */}
+        {isTasker && (<EntryPointCard title="Create Compute Demand" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [taskType, setTaskType] = useState('model-training');
             const [runtime, setRuntime] = useState('docker');
@@ -217,7 +156,7 @@ export default function ComputeMarketTab({ provider, publicKeyHex, contractHash,
               requires_gpu: sdk.CLValue.newCLBool(requiresGpu),
               min_vram_mb: sdk.CLValue.newCLUInt64(minVram),
             }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Post a compute demand for providers to bid on.</div>
+              <div className="text-xs text-muted-foreground">Request compute resources. The router automatically matches you with a provider, generates an agreement, and pays out after completion if no dispute is raised.</div>
               <Input label="Task Type" value={taskType} onChange={setTaskType} />
               <Input label="Runtime" value={runtime} onChange={setRuntime} />
               <Input label="Max Cost (CSPR)" value={maxCost} onChange={setMaxCost} />
@@ -233,9 +172,10 @@ export default function ComputeMarketTab({ provider, publicKeyHex, contractHash,
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Cancel Demand */}
-        <EntryPointCard title="Cancel Demand" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Cancel Demand — tasker only */}
+        {isTasker && (<EntryPointCard title="Cancel Demand" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [demandId, setDemandId] = useState('');
             return <form onSubmit={(e) => { e.preventDefault(); submit('cancel_demand', {
@@ -247,200 +187,74 @@ export default function ComputeMarketTab({ provider, publicKeyHex, contractHash,
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Create Offer */}
-        <EntryPointCard title="Create Offer" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [demandId, setDemandId] = useState('');
-            const [price, setPrice] = useState('50');
-            const priceMotes = Math.floor(parseFloat(price || '0') * 1e9).toString();
-            return <form onSubmit={(e) => { e.preventDefault(); submit('create_offer', {
-              demand_id: sdk.CLValue.newCLString(demandId),
-              price: sdk.CLValue.newCLUInt512(priceMotes),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Submit an offer to fulfill a compute demand.</div>
-              <Input label="Demand ID" value={demandId} onChange={setDemandId} />
-              <Input label="Price (CSPR)" value={price} onChange={setPrice} />
-              <Button type="submit" disabled={!canSign || !demandId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Create Offer</Button>
-            </form>;
-          }}
-        </EntryPointCard>
+        {/* Offers and agreements are automatically generated by the router when a demand is created */}
 
-        {/* Cancel Offer */}
-        <EntryPointCard title="Cancel Offer" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [offerId, setOfferId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('cancel_offer', {
-              offer_id: sdk.CLValue.newCLString(offerId),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Withdraw a pending offer.</div>
-              <Input label="Offer ID" value={offerId} onChange={setOfferId} />
-              <Button type="submit" disabled={!canSign || !offerId.trim()} variant="danger" className="w-full">Cancel Offer</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Create Agreement */}
-        <EntryPointCard title="Create Agreement" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [demandId, setDemandId] = useState('');
-            const [offerId, setOfferId] = useState('');
-            const [amount, setAmount] = useState('50');
-            const amountMotes = Math.floor(parseFloat(amount || '0') * 1e9).toString();
-            return <form onSubmit={(e) => { e.preventDefault(); submit('create_agreement', {
-              demand_id: sdk.CLValue.newCLString(demandId),
-              offer_id: sdk.CLValue.newCLString(offerId),
-              amount: sdk.CLValue.newCLUInt512(amountMotes),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Create an agreement from a demand + offer.</div>
-              <Input label="Demand ID" value={demandId} onChange={setDemandId} />
-              <Input label="Offer ID" value={offerId} onChange={setOfferId} />
-              <Input label="Amount (CSPR)" value={amount} onChange={setAmount} />
-              <Button type="submit" disabled={!canSign || !demandId.trim() || !offerId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Create Agreement</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Approve Agreement */}
-        <EntryPointCard title="Approve Agreement" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Rate Provider — consumer rates the compute provider after agreement is terminated */}
+        {isTasker && (<EntryPointCard title="Rate Provider" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [agreementId, setAgreementId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('approve_agreement', {
+            const [rating, setRating] = useState(0);
+            const completedAgreements = agreements.filter(a => a.status === 'terminated');
+            return <form onSubmit={(e) => { e.preventDefault(); submit('rate_provider', {
               agreement_id: sdk.CLValue.newCLString(agreementId),
+              rating: sdk.CLValue.newCLUint64(String(rating)),
             }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><CheckCircle className="h-3 w-3" />Approve a pending agreement.</div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1"><Star className="h-3 w-3 text-[#00e5ff]" />Rate the compute provider after agreement completion. Recorded on-chain.</div>
+              {completedAgreements.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {completedAgreements.map(a => (
+                    <button key={a.id} type="button" onClick={() => setAgreementId(a.id)}
+                      className={`text-[10px] px-2 py-1 rounded font-mono ${agreementId === a.id ? 'bg-[#00e5ff]/20 text-[#00e5ff]' : 'bg-white/5 text-[#7a7468] hover:bg-white/10'}`}>
+                      {a.id}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Input label="Agreement ID" value={agreementId} onChange={setAgreementId} />
-              <Button type="submit" disabled={!canSign || !agreementId.trim()} className="w-full"><CheckCircle className="h-4 w-4 mr-1" />Approve</Button>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Provider Rating</label>
+                <StarRating value={rating} onChange={setRating} />
+              </div>
+              <Button type="submit" disabled={!canSign || !agreementId.trim() || rating === 0} className="w-full"><Star className="h-4 w-4 mr-1" />Rate Provider</Button>
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Reject Agreement */}
-        <EntryPointCard title="Reject Agreement" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Rate Consumer — provider rates the consumer after agreement is completed */}
+        {isProvider && (<EntryPointCard title="Rate Consumer" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [agreementId, setAgreementId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('reject_agreement', {
+            const [rating, setRating] = useState(0);
+            const completedAgreements = agreements.filter(a => a.status === 'terminated');
+            return <form onSubmit={(e) => { e.preventDefault(); submit('rate_consumer', {
               agreement_id: sdk.CLValue.newCLString(agreementId),
+              rating: sdk.CLValue.newCLUint64(String(rating)),
             }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><XCircle className="h-3 w-3" />Reject a pending agreement.</div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1"><Star className="h-3 w-3 text-[#00e5ff]" />Rate the consumer after compute agreement completion. Recorded on-chain.</div>
+              {completedAgreements.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {completedAgreements.map(a => (
+                    <button key={a.id} type="button" onClick={() => setAgreementId(a.id)}
+                      className={`text-[10px] px-2 py-1 rounded font-mono ${agreementId === a.id ? 'bg-[#00e5ff]/20 text-[#00e5ff]' : 'bg-white/5 text-[#7a7468] hover:bg-white/10'}`}>
+                      {a.id}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Input label="Agreement ID" value={agreementId} onChange={setAgreementId} />
-              <Button type="submit" disabled={!canSign || !agreementId.trim()} variant="danger" className="w-full"><XCircle className="h-4 w-4 mr-1" />Reject</Button>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Consumer Rating</label>
+                <StarRating value={rating} onChange={setRating} />
+              </div>
+              <Button type="submit" disabled={!canSign || !agreementId.trim() || rating === 0} className="w-full"><Star className="h-4 w-4 mr-1" />Rate Consumer</Button>
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Start Agreement */}
-        <EntryPointCard title="Start Agreement" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [agreementId, setAgreementId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('start_agreement', {
-              agreement_id: sdk.CLValue.newCLString(agreementId),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Start execution of an approved agreement.</div>
-              <Input label="Agreement ID" value={agreementId} onChange={setAgreementId} />
-              <Button type="submit" disabled={!canSign || !agreementId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Start</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Terminate Agreement */}
-        <EntryPointCard title="Terminate Agreement" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [agreementId, setAgreementId] = useState('');
-            const [resultHash, setResultHash] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('terminate_agreement', {
-              agreement_id: sdk.CLValue.newCLString(agreementId),
-              result_hash: sdk.CLValue.newCLString(resultHash),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Terminate an active agreement with results.</div>
-              <Input label="Agreement ID" value={agreementId} onChange={setAgreementId} />
-              <Input label="Result Hash" value={resultHash} onChange={setResultHash} />
-              <Button type="submit" disabled={!canSign || !agreementId.trim()} variant="danger" className="w-full">Terminate</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Issue Debit Note */}
-        <EntryPointCard title="Issue Debit Note" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [agreementId, setAgreementId] = useState('');
-            const [usageSeconds, setUsageSeconds] = useState('3600');
-            const [usageCost, setUsageCost] = useState('10');
-            const costMotes = Math.floor(parseFloat(usageCost || '0') * 1e9).toString();
-            return <form onSubmit={(e) => { e.preventDefault(); submit('issue_debit_note', {
-              agreement_id: sdk.CLValue.newCLString(agreementId),
-              usage_seconds: sdk.CLValue.newCLUInt64(usageSeconds),
-              usage_cost: sdk.CLValue.newCLUInt512(costMotes),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><DollarSign className="h-3 w-3" />Bill for compute usage.</div>
-              <Input label="Agreement ID" value={agreementId} onChange={setAgreementId} />
-              <Input label="Usage (seconds)" value={usageSeconds} onChange={setUsageSeconds} />
-              <Input label="Usage Cost (CSPR)" value={usageCost} onChange={setUsageCost} />
-              <Button type="submit" disabled={!canSign || !agreementId.trim()} className="w-full"><DollarSign className="h-4 w-4 mr-1" />Issue Debit Note</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Accept Debit Note */}
-        <EntryPointCard title="Accept Debit Note" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [noteId, setNoteId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('accept_debit_note', {
-              note_id: sdk.CLValue.newCLString(noteId),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><CheckCircle className="h-3 w-3" />Accept a debit note for payment.</div>
-              <Input label="Debit Note ID" value={noteId} onChange={setNoteId} />
-              <Button type="submit" disabled={!canSign || !noteId.trim()} className="w-full"><CheckCircle className="h-4 w-4 mr-1" />Accept</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Reject Debit Note */}
-        <EntryPointCard title="Reject Debit Note" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [noteId, setNoteId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('reject_debit_note', {
-              note_id: sdk.CLValue.newCLString(noteId),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><XCircle className="h-3 w-3" />Reject a debit note.</div>
-              <Input label="Debit Note ID" value={noteId} onChange={setNoteId} />
-              <Button type="submit" disabled={!canSign || !noteId.trim()} variant="danger" className="w-full"><XCircle className="h-4 w-4 mr-1" />Reject</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Claim Debit Note */}
-        <EntryPointCard title="Claim Debit Note" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [noteId, setNoteId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('claim_debit_note', {
-              note_id: sdk.CLValue.newCLString(noteId),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Claim payment for an accepted debit note (provider).</div>
-              <Input label="Debit Note ID" value={noteId} onChange={setNoteId} />
-              <Button type="submit" disabled={!canSign || !noteId.trim()} className="w-full"><DollarSign className="h-4 w-4 mr-1" />Claim</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Pause/Resume */}
-        <EntryPointCard title="Pause Provider" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => (
-            <form onSubmit={(e) => { e.preventDefault(); submit('pause_provider', {}); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><Pause className="h-3 w-3" />Stop accepting compute jobs.</div>
-              <Button type="submit" disabled={!canSign} variant="danger" className="w-full"><Pause className="h-4 w-4 mr-1" />Pause</Button>
-            </form>
-          )}
-        </EntryPointCard>
-
-        <EntryPointCard title="Resume Provider" contract="ComputeMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => (
-            <form onSubmit={(e) => { e.preventDefault(); submit('resume_provider', {}); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><Play className="h-3 w-3" />Resume accepting compute jobs.</div>
-              <Button type="submit" disabled={!canSign} className="w-full"><Play className="h-4 w-4 mr-1" />Resume</Button>
-            </form>
-          )}
-        </EntryPointCard>
       </div>
     </div>
   );

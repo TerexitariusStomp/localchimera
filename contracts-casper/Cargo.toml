@@ -4,10 +4,6 @@ members = [
     "order-book",
     "escrow-vault",
     "reputation",
-    "inference-market",
-    "storage-market",
-    "bandwidth-market",
-    "compute-market",
 ]
 resolver = "2"
 

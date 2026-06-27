@@ -303,6 +303,8 @@ jobs:
           npm run build
       - name: Copy frontend to Expo assets
         run: node apps/mobile-expo/scripts/copy-frontend.js
+      - name: Generate asset manifest for Metro bundling
+        run: node apps/mobile-expo/scripts/gen-asset-manifest.js
       - name: Install Expo deps
         run: |
           cd apps/mobile-expo

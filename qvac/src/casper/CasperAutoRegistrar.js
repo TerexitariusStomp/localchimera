@@ -9,10 +9,10 @@ const RPC_URL = process.env.CASPER_RPC_URL || 'https://node.testnet.casper.netwo
 const PAYMENT = process.env.CASPER_PAYMENT || '3000000000'; // 3 CSPR — contract pays gas via DirectInvocationOnly
 
 const CONTRACT_HASHES = {
-  inferenceMarket: process.env.CASPER_INFERENCE_MARKET || '116a2fa615c47c6cf027b3c8238cee265cb5271cdc8398fa98452ccaaf11d8d9',
-  storageMarket: process.env.CASPER_STORAGE_MARKET || '8b8b61ff8b5792c920e4dcda6a4a1357a01ccbec1339d7106fd1db67eeced49c',
-  computeMarket: process.env.CASPER_COMPUTE_MARKET || 'ee722f68272a3f50d913b645474ccff5c5ba1281f2f14d6dae925480c1931bad',
-  bandwidthMarket: process.env.CASPER_BANDWIDTH_MARKET || 'a69dc20172f48f6193b3aa9e653c663e91386ca923073fccc965eb0a1d5538ea',
+  inferenceMarket: process.env.CASPER_INFERENCE_MARKET || '663812cfe4103b9d1584e3caccf7be9188e4c6c5f77851dacb64b8f308947f82',
+  storageMarket: process.env.CASPER_STORAGE_MARKET || '1e884efc1a97e698149b91e5ffb7d1e8cda85598a4db75ac5b3be379418a2dca',
+  computeMarket: process.env.CASPER_COMPUTE_MARKET || 'c1e96f072f632d681106d367cd34b4ec9d86258f10106c2cb9dcf23306c53af8',
+  bandwidthMarket: process.env.CASPER_BANDWIDTH_MARKET || '4361a385408288194b54c7297e7f1754833f31a2ae88f3d1c5eabee4798897a1',
 };
 
 const DEFAULT_STAKE_MOTES = '1000000000'; // 1 CSPR

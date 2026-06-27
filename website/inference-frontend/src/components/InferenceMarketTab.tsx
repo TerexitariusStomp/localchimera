@@ -1,17 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import EntryPointCard from './EntryPointCard';
-import { Button, Input, Card, Badge, TextArea } from './ui';
-import { Send, Brain, Users, FileText, RefreshCw, Pause, Play, AlertTriangle, Gavel } from 'lucide-react';
+import { Button, Input, TextArea, StarRating } from './ui';
+import { Send, Brain, RefreshCw, AlertTriangle, Gavel, Shield, Star } from 'lucide-react';
 import type { TxRecord } from '../types';
 import * as sdk from 'casper-js-sdk';
 import { getContractNamedKeys, queryDictionary, callEntryPointWithWallet } from '../casper-client';
 
-function accountHashToBytes(hashStr: string): Uint8Array {
-  const bytes = new Uint8Array(32);
-  const hex = hashStr.replace('account-hash-', '');
-  for (let i = 0; i < 32; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
-  return bytes;
-}
+const ADMIN_PUBLIC_KEY = '020227d8dd5ccaa600e45b36e598d90ef8c26b6c67ef81bdfebde8fa583997a91ea5';
 
 function publicKeyToAccountHashHex(publicKeyHex: string): string {
   try {
@@ -20,6 +15,13 @@ function publicKeyToAccountHashHex(publicKeyHex: string): string {
   } catch {
     return '';
   }
+}
+
+function accountHashToBytes(hashStr: string): Uint8Array {
+  const bytes = new Uint8Array(32);
+  const hex = hashStr.replace('account-hash-', '');
+  for (let i = 0; i < 32; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return bytes;
 }
 
 interface ModelInfo {
@@ -57,10 +59,13 @@ const JOB_STATUS: Record<string, string> = {
   '4': 'paid', '5': 'refunded', '6': 'disputed', '7': 'resolved',
 };
 
-export default function InferenceMarketTab({ provider, publicKeyHex, contractHash, accountHash, onTx }: {
-  provider: any; publicKeyHex: string; contractHash: string; accountHash: string; onTx: (tx: TxRecord) => void;
+export default function InferenceMarketTab({ provider, publicKeyHex, contractHash, accountHash, onTx, view = 'tasker' }: {
+  provider: any; publicKeyHex: string; contractHash: string; accountHash: string; onTx: (tx: TxRecord) => void; view?: 'tasker' | 'provider';
 }) {
   const canSign = !!provider && !!publicKeyHex;
+  const isAdmin = publicKeyHex === ADMIN_PUBLIC_KEY;
+  const isTasker = view === 'tasker';
+  const isProvider = view === 'provider';
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [providersList, setProvidersList] = useState<ProviderInfo[]>([]);
   const [jobs, setJobs] = useState<JobInfo[]>([]);
@@ -155,143 +160,20 @@ export default function InferenceMarketTab({ provider, publicKeyHex, contractHas
         </button>
       </div>
 
-      {/* Models Board */}
-      <Card className="p-4">
-        <h3 className="font-semibold flex items-center gap-2 mb-2"><FileText className="h-4 w-4" />Registered Models</h3>
-        {models.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No models registered yet.</p>
-        ) : (
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {models.map((m) => (
-              <div key={m.id} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
-                <div className="flex items-center gap-2">
-                  <Badge variant="default">{m.id}</Badge>
-                  <span className="font-medium">{m.name}</span>
-                  {m.requiresGpu && <Badge variant="warning">GPU</Badge>}
-                </div>
-                <div className="text-muted-foreground">{(Number(m.pricePerToken) / 1e9).toFixed(6)} CSPR/token · {m.maxContext} ctx</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Providers Board */}
-      <Card className="p-4">
-        <h3 className="font-semibold flex items-center gap-2 mb-2"><Users className="h-4 w-4" />Providers</h3>
-        {providersList.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No providers registered from this account.</p>
-        ) : (
-          <div className="space-y-2">
-            {providersList.map((p) => (
-              <div key={p.address} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
-                <div className="flex items-center gap-2">
-                  <span className={`inline-block h-2 w-2 rounded-full ${p.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                  <span className="font-medium">{p.name}</span>
-                  {p.hasGpu && <Badge variant="warning">GPU {p.vram}MB</Badge>}
-                </div>
-                <div className="text-muted-foreground">{p.models} · {(Number(p.stake) / 1e9).toFixed(4)} CSPR</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Jobs Board */}
-      <Card className="p-4">
-        <h3 className="font-semibold flex items-center gap-2 mb-2"><FileText className="h-4 w-4" />Recent Jobs</h3>
-        {jobs.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No jobs created yet.</p>
-        ) : (
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {jobs.map((j) => (
-              <div key={j.id} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
-                <div className="flex items-center gap-2">
-                  <Badge variant={j.status === 'confirmed' || j.status === 'paid' ? 'success' : j.status === 'disputed' ? 'error' : 'warning'}>{j.status}</Badge>
-                  <span className="font-mono">{j.id}</span>
-                  <span className="text-muted-foreground">{j.modelId}</span>
-                </div>
-                <div className="text-muted-foreground">{(Number(j.amount) / 1e9).toFixed(4)} CSPR</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Register Model */}
-        <EntryPointCard title="Register Model" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [modelId, setModelId] = useState('phi-3-mini');
-            const [name, setName] = useState('Phi-3 Mini');
-            const [pricePerToken, setPricePerToken] = useState('0.001');
-            const [requiresGpu, setRequiresGpu] = useState(false);
-            const [minVram, setMinVram] = useState('0');
-            const [maxContext, setMaxContext] = useState('4096');
-            const priceMotes = Math.floor(parseFloat(pricePerToken || '0') * 1e9).toString();
-            return <form onSubmit={(e) => { e.preventDefault(); submit('register_model', {
-              model_id: sdk.CLValue.newCLString(modelId),
-              name: sdk.CLValue.newCLString(name),
-              price_per_token: sdk.CLValue.newCLUInt512(priceMotes),
-              requires_gpu: sdk.CLValue.newCLBool(requiresGpu),
-              min_vram_mb: sdk.CLValue.newCLUInt64(minVram),
-              max_context: sdk.CLValue.newCLUInt64(maxContext),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Register a new AI model for inference.</div>
-              <Input label="Model ID" value={modelId} onChange={setModelId} />
-              <Input label="Display Name" value={name} onChange={setName} />
-              <Input label="Price per Token (CSPR)" value={pricePerToken} onChange={setPricePerToken} />
-              <Input label="Max Context Length" value={maxContext} onChange={setMaxContext} />
-              <div className="flex items-center gap-2">
-                <label className="text-sm flex items-center gap-2">
-                  <input type="checkbox" checked={requiresGpu} onChange={(e) => setRequiresGpu(e.target.checked)} className="rounded" />
-                  Requires GPU
-                </label>
-                {requiresGpu && <Input label="Min VRAM (MB)" value={minVram} onChange={setMinVram} />}
-              </div>
-              <Button type="submit" disabled={!canSign || !modelId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Register Model</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Update Model Price */}
-        <EntryPointCard title="Update Model Price" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [modelId, setModelId] = useState('');
-            const [price, setPrice] = useState('0.001');
-            const priceMotes = Math.floor(parseFloat(price || '0') * 1e9).toString();
-            return <form onSubmit={(e) => { e.preventDefault(); submit('update_model_price', {
-              model_id: sdk.CLValue.newCLString(modelId),
-              price_per_token: sdk.CLValue.newCLUInt512(priceMotes),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Update the price per token for an existing model.</div>
-              <Input label="Model ID" value={modelId} onChange={setModelId} placeholder="e.g. phi-3-mini" />
-              <Input label="New Price per Token (CSPR)" value={price} onChange={setPrice} />
-              <Button type="submit" disabled={!canSign || !modelId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Update Price</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Provider registration is automatic when the node starts */}
-
-        {/* Create Job */}
-        <EntryPointCard title="Create Inference Job" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Create Job — simplified: only funds + optional min tokens, router auto-assigns provider/model */}
+        {isTasker && (<EntryPointCard title="Request Inference" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {() => {
-            const [providerAddr, setProviderAddr] = useState('');
-            const [modelId, setModelId] = useState('phi-3-mini');
-            const [maxTokens, setMaxTokens] = useState('1024');
-            const [requestHash, setRequestHash] = useState('');
             const [amount, setAmount] = useState('10');
+            const [minTokens, setMinTokens] = useState('256');
+            const [promptText, setPromptText] = useState('');
             const amountMotes = Math.floor(parseFloat(amount || '0') * 1e9).toString();
             const handleSubmit = async (e: any) => {
               e.preventDefault();
-              if (!canSign || !providerAddr.trim()) return;
-              const walletAccountHash = publicKeyToAccountHashHex(publicKeyHex);
+              if (!canSign || !promptText.trim()) return;
               const result = await callEntryPointWithWallet(provider, publicKeyHex, contractHash, 'create_job', {
-                provider: sdk.CLValue.newCLByteArray(accountHashToBytes(providerAddr.replace('account-hash-', ''))),
-                model_id: sdk.CLValue.newCLString(modelId),
-                max_tokens: sdk.CLValue.newCLUInt64(maxTokens),
-                request_hash: sdk.CLValue.newCLString(requestHash),
+                prompt: sdk.CLValue.newCLString(promptText),
+                min_tokens: sdk.CLValue.newCLUInt64(minTokens || '0'),
                 amount: sdk.CLValue.newCLUInt512(amountMotes),
               });
               if (result.deployHash) {
@@ -299,131 +181,124 @@ export default function InferenceMarketTab({ provider, publicKeyHex, contractHas
               }
             };
             return <form onSubmit={handleSubmit} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Request inference from a specific provider.</div>
-              <Input label="Provider Account Hash" value={providerAddr} onChange={setProviderAddr} placeholder="account-hash-..." />
-              <Input label="Model ID" value={modelId} onChange={setModelId} />
-              <Input label="Max Tokens" value={maxTokens} onChange={setMaxTokens} />
-              <Input label="Request Hash (IPFS/prompt hash)" value={requestHash} onChange={setRequestHash} />
+              <div className="text-xs text-muted-foreground">Submit a prompt for inference. The router automatically assigns an available provider and model.</div>
+              <TextArea label="Prompt" value={promptText} onChange={setPromptText} placeholder="Enter your inference prompt..." rows={4} />
               <Input label="Funds (CSPR)" value={amount} onChange={setAmount} />
-              <Button type="submit" disabled={!canSign || !providerAddr.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Create Job</Button>
+              <Input label="Min Tokens (optional)" value={minTokens} onChange={setMinTokens} />
+              <Button type="submit" disabled={!canSign || !promptText.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Request Inference</Button>
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Provider Ack */}
-        <EntryPointCard title="Provider Acknowledge Job" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Confirm & Rate Provider — consumer confirms job and rates provider */}
+        {isTasker && (<EntryPointCard title="Confirm & Rate Provider" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [jobId, setJobId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('provider_ack', {
-              job_id: sdk.CLValue.newCLString(jobId),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Acknowledge a job as a provider.</div>
-              <Input label="Job ID" value={jobId} onChange={setJobId} />
-              <Button type="submit" disabled={!canSign || !jobId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Acknowledge</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Provider Complete */}
-        <EntryPointCard title="Provider Complete Job" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [jobId, setJobId] = useState('');
-            const [responseHash, setResponseHash] = useState('');
-            const [tokensGenerated, setTokensGenerated] = useState('1024');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('provider_complete', {
-              job_id: sdk.CLValue.newCLString(jobId),
-              response_hash: sdk.CLValue.newCLString(responseHash),
-              tokens_generated: sdk.CLValue.newCLUInt64(tokensGenerated),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Submit inference results for a job.</div>
-              <Input label="Job ID" value={jobId} onChange={setJobId} />
-              <Input label="Response Hash (IPFS/result hash)" value={responseHash} onChange={setResponseHash} />
-              <Input label="Tokens Generated" value={tokensGenerated} onChange={setTokensGenerated} />
-              <Button type="submit" disabled={!canSign || !jobId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Complete Job</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Consumer Confirm */}
-        <EntryPointCard title="Consumer Confirm Job" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [jobId, setJobId] = useState('');
-            const [rating, setRating] = useState('5');
+            const [rating, setRating] = useState(0);
+            const pendingJobs = jobs.filter(j => j.status === 'completed');
             return <form onSubmit={(e) => { e.preventDefault(); submit('consumer_confirm', {
               job_id: sdk.CLValue.newCLString(jobId),
-              rating: sdk.CLValue.newCLUInt64(rating),
+              rating: sdk.CLValue.newCLUint64(String(rating)),
             }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Confirm job completion and rate the provider.</div>
+              <div className="text-xs text-muted-foreground">Confirm job completion and rate the provider. Payment auto-releases after 1 hour if no dispute is raised.</div>
+              {pendingJobs.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {pendingJobs.map(j => (
+                    <button key={j.id} type="button" onClick={() => setJobId(j.id)}
+                      className={`text-[10px] px-2 py-1 rounded font-mono ${jobId === j.id ? 'bg-[#00e5ff]/20 text-[#00e5ff]' : 'bg-white/5 text-[#7a7468] hover:bg-white/10'}`}>
+                      {j.id}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Input label="Job ID" value={jobId} onChange={setJobId} />
-              <Input label="Rating (1-5)" value={rating} onChange={setRating} />
-              <Button type="submit" disabled={!canSign || !jobId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Confirm & Rate</Button>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Provider Rating</label>
+                <StarRating value={rating} onChange={setRating} />
+              </div>
+              <Button type="submit" disabled={!canSign || !jobId.trim() || rating === 0} className="w-full"><Send className="h-4 w-4 mr-1" />Confirm & Rate</Button>
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Claim Payment */}
-        <EntryPointCard title="Claim Payment" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Rate Consumer — provider rates the consumer after job is confirmed/paid */}
+        {isProvider && (<EntryPointCard title="Rate Consumer" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [jobId, setJobId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('claim_payment', {
+            const [rating, setRating] = useState(0);
+            const completedJobs = jobs.filter(j => j.status === 'confirmed' || j.status === 'paid' || j.status === 'resolved');
+            return <form onSubmit={(e) => { e.preventDefault(); submit('rate_consumer', {
               job_id: sdk.CLValue.newCLString(jobId),
+              rating: sdk.CLValue.newCLUint64(String(rating)),
             }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Claim payment for a confirmed job (provider only).</div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1"><Star className="h-3 w-3 text-[#00e5ff]" />Rate the consumer after job completion. Recorded on-chain.</div>
+              {completedJobs.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {completedJobs.map(j => (
+                    <button key={j.id} type="button" onClick={() => setJobId(j.id)}
+                      className={`text-[10px] px-2 py-1 rounded font-mono ${jobId === j.id ? 'bg-[#00e5ff]/20 text-[#00e5ff]' : 'bg-white/5 text-[#7a7468] hover:bg-white/10'}`}>
+                      {j.id}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Input label="Job ID" value={jobId} onChange={setJobId} />
-              <Button type="submit" disabled={!canSign || !jobId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Claim Payment</Button>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Consumer Rating</label>
+                <StarRating value={rating} onChange={setRating} />
+              </div>
+              <Button type="submit" disabled={!canSign || !jobId.trim() || rating === 0} className="w-full"><Star className="h-4 w-4 mr-1" />Rate Consumer</Button>
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Pause/Resume Provider */}
-        <EntryPointCard title="Pause Provider" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            return <form onSubmit={(e) => { e.preventDefault(); submit('pause_provider', {}); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><Pause className="h-3 w-3" />Temporarily stop accepting jobs.</div>
-              <Button type="submit" disabled={!canSign} variant="danger" className="w-full"><Pause className="h-4 w-4 mr-1" />Pause</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        <EntryPointCard title="Resume Provider" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            return <form onSubmit={(e) => { e.preventDefault(); submit('resume_provider', {}); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><Play className="h-3 w-3" />Resume accepting jobs.</div>
-              <Button type="submit" disabled={!canSign} className="w-full"><Play className="h-4 w-4 mr-1" />Resume</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Dispute & Resolve */}
-        <EntryPointCard title="Dispute Job" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Dispute Job — consumer can dispute within 1 hour */}
+        {isTasker && (<EntryPointCard title="Dispute Job" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [jobId, setJobId] = useState('');
             const [evidence, setEvidence] = useState('');
+            const disputableJobs = jobs.filter(j => j.status === 'completed' || j.status === 'confirmed');
             return <form onSubmit={(e) => { e.preventDefault(); submit('dispute_job', {
               job_id: sdk.CLValue.newCLString(jobId),
               evidence_hash: sdk.CLValue.newCLString(evidence),
             }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-amber-400" />Raise a dispute for a job.</div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-amber-400" />Raise a dispute within 1 hour of completion to prevent automatic payout.</div>
+              {disputableJobs.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {disputableJobs.map(j => (
+                    <button key={j.id} type="button" onClick={() => setJobId(j.id)}
+                      className={`text-[10px] px-2 py-1 rounded font-mono ${jobId === j.id ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-[#7a7468] hover:bg-white/10'}`}>
+                      {j.id}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Input label="Job ID" value={jobId} onChange={setJobId} />
               <Input label="Evidence Hash" value={evidence} onChange={setEvidence} />
               <Button type="submit" disabled={!canSign || !jobId.trim()} variant="danger" className="w-full"><Gavel className="h-4 w-4 mr-1" />Dispute</Button>
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Set Protocol Fee */}
-        <EntryPointCard title="Set Protocol Fee (Admin)" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [feeBps, setFeeBps] = useState('250');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('set_protocol_fee_bps', {
-              fee_bps: sdk.CLValue.newCLUInt64(feeBps),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Set protocol fee in basis points (owner only).</div>
-              <Input label="Fee (BPS)" value={feeBps} onChange={setFeeBps} />
-              <Button type="submit" disabled={!canSign} variant="outline" className="w-full"><Send className="h-4 w-4 mr-1" />Set Fee</Button>
-            </form>;
-          }}
-        </EntryPointCard>
+        {/* Admin only: Set Protocol Fee */}
+        {isProvider && isAdmin && (
+          <EntryPointCard title="Set Protocol Fee (Admin)" contract="InferenceMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+            {({ submit }) => {
+              const [feeBps, setFeeBps] = useState('250');
+              return <form onSubmit={(e) => { e.preventDefault(); submit('set_protocol_fee_bps', {
+                fee_bps: sdk.CLValue.newCLUint64(feeBps),
+              }); }} className="space-y-2">
+                <div className="text-xs text-muted-foreground flex items-center gap-1"><Shield className="h-3 w-3 text-[#00e5ff]" />Set protocol fee in basis points (admin only).</div>
+                <Input label="Fee (BPS)" value={feeBps} onChange={setFeeBps} />
+                <Button type="submit" disabled={!canSign} variant="outline" className="w-full"><Send className="h-4 w-4 mr-1" />Set Fee</Button>
+              </form>;
+            }}
+          </EntryPointCard>
+        )}
       </div>
     </div>
   );

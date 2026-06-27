@@ -28,6 +28,8 @@ const CONSUMER_JOBS: &str = "consumer_jobs";
 const PROVIDER_JOBS: &str = "provider_jobs";
 const PENDING_JOBS: &str = "pending_jobs";
 const CONTRACT_PURSE: &str = "contract_purse";
+const CHALLENGES_DICT: &str = "challenges_dict";
+const PROTOCOL_FEE_BPS: &str = "protocol_fee_bps";
 
 const STATE_PENDING: u8 = 0;
 const STATE_ASSIGNED: u8 = 1;
@@ -195,6 +197,218 @@ fn create_entry_points() -> EntryPoints {
         EntryPointPayment::Caller,
     ));
 
+    eps.add_entry_point(EntityEntryPoint::new(
+        "submit_evidence",
+        vec![
+            Parameter::new("job_id", CLType::String),
+            Parameter::new("evidence_hash", CLType::String),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "set_protocol_fee_bps",
+        vec![Parameter::new("fee_bps", CLType::U64)],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "issue_challenge",
+        vec![
+            Parameter::new("file_id", CLType::String),
+            Parameter::new("challenge_hash", CLType::String),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "verify_challenge",
+        vec![
+            Parameter::new("challenge_id", CLType::String),
+            Parameter::new("passed", CLType::Bool),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "submit_kleros_verdict",
+        vec![
+            Parameter::new("job_id", CLType::String),
+            Parameter::new("kleros_dispute_id", CLType::U64),
+            Parameter::new("ruling", CLType::U64),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "create_session",
+        vec![
+            Parameter::new("consumer_pubkey", CLType::String),
+            Parameter::new("max_duration_sec", CLType::U64),
+            Parameter::new("max_data_mb", CLType::U64),
+            Parameter::new("amount", U512::cl_type()),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "create_allocation",
+        vec![
+            Parameter::new("data_shards", CLType::U64),
+            Parameter::new("parity_shards", CLType::U64),
+            Parameter::new("size_mb", CLType::U64),
+            Parameter::new("expiry_ms", CLType::U64),
+            Parameter::new("amount", U512::cl_type()),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "store_file",
+        vec![
+            Parameter::new("alloc_id", CLType::String),
+            Parameter::new("file_hash", CLType::String),
+            Parameter::new("size_mb", CLType::U64),
+            Parameter::new("amount", U512::cl_type()),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "create_demand",
+        vec![
+            Parameter::new("task_type", CLType::String),
+            Parameter::new("runtime", CLType::String),
+            Parameter::new("max_cost", U512::cl_type()),
+            Parameter::new("duration_sec", CLType::U64),
+            Parameter::new("requires_gpu", CLType::Bool),
+            Parameter::new("min_vram_mb", CLType::U64),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "remove_file",
+        vec![Parameter::new("file_id", CLType::String)],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "cancel_allocation",
+        vec![Parameter::new("alloc_id", CLType::String)],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "cancel_demand",
+        vec![Parameter::new("demand_id", CLType::String)],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "cancel_job",
+        vec![Parameter::new("job_id", CLType::String)],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "close_session",
+        vec![Parameter::new("session_id", CLType::String)],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "rate_provider",
+        vec![
+            Parameter::new("file_id", CLType::String),
+            Parameter::new("session_id", CLType::String),
+            Parameter::new("agreement_id", CLType::String),
+            Parameter::new("rating", CLType::U64),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "dispute_session",
+        vec![
+            Parameter::new("session_id", CLType::String),
+            Parameter::new("evidence_hash", CLType::String),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "dispute_file",
+        vec![
+            Parameter::new("file_id", CLType::String),
+            Parameter::new("evidence_hash", CLType::String),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    eps.add_entry_point(EntityEntryPoint::new(
+        "dispute_agreement",
+        vec![
+            Parameter::new("agreement_id", CLType::String),
+            Parameter::new("evidence_hash", CLType::String),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
 
     eps
 }
@@ -214,7 +428,7 @@ pub extern "C" fn create_job() {
     let provider_fee_bps: u64 = runtime::get_named_arg("provider_fee_bps");
     let order_id: String = runtime::get_named_arg("order_id");
 
-    let now: u64 = runtime::get_blocktime().into();
+    let now: u64 = Into::<u64>::into(runtime::get_blocktime());
     let valid_until = now + 3_600_000;
     let task_type: u64 = 0;
 
@@ -283,7 +497,7 @@ pub extern "C" fn provider_ack() {
         runtime::revert(ApiError::User(4));
     }
 
-    let now: u64 = runtime::get_blocktime().into();
+    let now: u64 = Into::<u64>::into(runtime::get_blocktime());
     write_dict(jobs_dict, &format!("{}:state", job_id), STATE_ASSIGNED);
     write_dict(jobs_dict, &format!("{}:acked_at", job_id), now);
 
@@ -315,7 +529,7 @@ pub extern "C" fn provider_complete() {
         runtime::revert(ApiError::User(4));
     }
 
-    let now: u64 = runtime::get_blocktime().into();
+    let now: u64 = Into::<u64>::into(runtime::get_blocktime());
     write_dict(jobs_dict, &format!("{}:state", job_id), STATE_PROVIDER_DONE);
     write_dict(jobs_dict, &format!("{}:response_hash", job_id), response_hash);
     write_dict(jobs_dict, &format!("{}:completed_at", job_id), now);
@@ -340,7 +554,7 @@ pub extern "C" fn consumer_confirm() {
         runtime::revert(ApiError::User(4));
     }
 
-    let now: u64 = runtime::get_blocktime().into();
+    let now: u64 = Into::<u64>::into(runtime::get_blocktime());
     write_dict(jobs_dict, &format!("{}:state", job_id), STATE_SETTLED);
     write_dict(jobs_dict, &format!("{}:settled_at", job_id), now);
     write_dict(jobs_dict, &format!("{}:rating", job_id), _rating);
@@ -533,7 +747,7 @@ pub extern "C" fn auto_release() {
 
     let completed_at: u64 = read_dict(jobs_dict, &format!("{}:completed_at", job_id))
         .unwrap_or_default();
-    let now: u64 = runtime::get_blocktime().into();
+    let now: u64 = Into::<u64>::into(runtime::get_blocktime());
     // Consumer has 1 hour from provider_complete to confirm or dispute
     if now < completed_at + 3_600_000 {
         runtime::revert(ApiError::User(5));
@@ -563,6 +777,493 @@ pub extern "C" fn auto_release() {
     write_dict(jobs_dict, &format!("{}:auto_released_at", job_id), now);
     write_dict(jobs_dict, &format!("{}:provider_claimed", job_id), true);
     write_dict(jobs_dict, &format!("{}:provider_payout", job_id), provider_payout);
+}
+
+#[no_mangle]
+pub extern "C" fn submit_evidence() {
+    let caller = runtime::get_caller();
+    let job_id: String = runtime::get_named_arg("job_id");
+    let evidence_hash: String = runtime::get_named_arg("evidence_hash");
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let provider: AccountHash = read_dict(jobs_dict, &format!("{}:provider", job_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    if provider != caller {
+        runtime::revert(ApiError::User(3));
+    }
+
+    let state: u8 = read_dict(jobs_dict, &format!("{}:state", job_id))
+        .unwrap_or(STATE_REFUNDED);
+    if state != STATE_DISPUTED {
+        runtime::revert(ApiError::User(4));
+    }
+
+    write_dict(jobs_dict, &format!("{}:provider_evidence", job_id), evidence_hash);
+    write_dict(jobs_dict, &format!("{}:provider_evidence_at", job_id), Into::<u64>::into(runtime::get_blocktime()));
+}
+
+#[no_mangle]
+pub extern "C" fn set_protocol_fee_bps() {
+    require_owner();
+    let fee_bps: u64 = runtime::get_named_arg("fee_bps");
+    if fee_bps > 10000 {
+        runtime::revert(ApiError::User(1));
+    }
+    let fee_uref = runtime::get_key(PROTOCOL_FEE_BPS)
+        .unwrap_or_revert()
+        .into_uref()
+        .unwrap_or_revert();
+    storage::write(fee_uref, fee_bps);
+}
+
+#[no_mangle]
+pub extern "C" fn issue_challenge() {
+    require_owner();
+    let file_id: String = runtime::get_named_arg("file_id");
+    let challenge_hash: String = runtime::get_named_arg("challenge_hash");
+    let challenges_dict = get_dict(CHALLENGES_DICT);
+    let now: u64 = Into::<u64>::into(runtime::get_blocktime());
+
+    let challenge_id = format!("challenge:{}:{}", file_id, now);
+    write_dict(challenges_dict, &format!("{}:file_id", challenge_id), file_id);
+    write_dict(challenges_dict, &format!("{}:challenge_hash", challenge_id), challenge_hash);
+    write_dict(challenges_dict, &format!("{}:issued_at", challenge_id), now);
+    write_dict(challenges_dict, &format!("{}:status", challenge_id), "pending");
+}
+
+#[no_mangle]
+pub extern "C" fn verify_challenge() {
+    require_owner();
+    let challenge_id: String = runtime::get_named_arg("challenge_id");
+    let passed: bool = runtime::get_named_arg("passed");
+    let challenges_dict = get_dict(CHALLENGES_DICT);
+
+    let status: String = read_dict(challenges_dict, &format!("{}:status", challenge_id))
+        .unwrap_or_default();
+    if status != "pending" {
+        runtime::revert(ApiError::User(4));
+    }
+
+    write_dict(challenges_dict, &format!("{}:status", challenge_id), if passed { "passed" } else { "failed" });
+    write_dict(challenges_dict, &format!("{}:verified_at", challenge_id), Into::<u64>::into(runtime::get_blocktime()));
+}
+
+#[no_mangle]
+pub extern "C" fn submit_kleros_verdict() {
+    let job_id: String = runtime::get_named_arg("job_id");
+    let kleros_dispute_id: u64 = runtime::get_named_arg("kleros_dispute_id");
+    let ruling: u64 = runtime::get_named_arg("ruling");
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let state: u8 = read_dict(jobs_dict, &format!("{}:state", job_id))
+        .unwrap_or(STATE_REFUNDED);
+    if state != STATE_DISPUTED {
+        runtime::revert(ApiError::User(4));
+    }
+
+    let consumer: AccountHash = read_dict(jobs_dict, &format!("{}:consumer", job_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    let provider: AccountHash = read_dict(jobs_dict, &format!("{}:provider", job_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    let amount: U512 = read_dict(jobs_dict, &format!("{}:amount", job_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+
+    write_dict(jobs_dict, &format!("{}:kleros_dispute_id", job_id), kleros_dispute_id);
+    write_dict(jobs_dict, &format!("{}:kleros_ruling", job_id), ruling);
+    write_dict(jobs_dict, &format!("{}:kleros_verdict_at", job_id), Into::<u64>::into(runtime::get_blocktime()));
+
+    let contract_purse = get_contract_purse();
+
+    if ruling == 1 {
+        // Consumer wins — full refund from escrow
+        system::transfer_from_purse_to_account(contract_purse, consumer, amount, None)
+            .unwrap_or_revert_with(ApiError::User(5));
+        write_dict(jobs_dict, &format!("{}:state", job_id), STATE_DISPUTE_CONSUMER_WON);
+        write_dict(jobs_dict, &format!("{}:consumer_refunded", job_id), true);
+    } else if ruling == 2 {
+        // Provider wins — full payout from escrow
+        system::transfer_from_purse_to_account(contract_purse, provider, amount, None)
+            .unwrap_or_revert_with(ApiError::User(5));
+        write_dict(jobs_dict, &format!("{}:state", job_id), STATE_DISPUTE_PROVIDER_WON);
+        write_dict(jobs_dict, &format!("{}:provider_paid", job_id), true);
+    } else {
+        // Ruling 0 (refused) — split escrow 50/50
+        let half = amount / U512::from(2);
+        let other_half = amount - half;
+        system::transfer_from_purse_to_account(contract_purse, consumer, half, None)
+            .unwrap_or_revert_with(ApiError::User(5));
+        system::transfer_from_purse_to_account(contract_purse, provider, other_half, None)
+            .unwrap_or_revert_with(ApiError::User(5));
+        write_dict(jobs_dict, &format!("{}:state", job_id), STATE_REFUNDED);
+        write_dict(jobs_dict, &format!("{}:split_refund", job_id), true);
+    }
+}
+
+// ============ RESOURCE CREATION ENTRY POINTS ============
+
+#[no_mangle]
+pub extern "C" fn create_session() {
+    let consumer_pubkey: String = runtime::get_named_arg("consumer_pubkey");
+    let max_duration_sec: u64 = runtime::get_named_arg("max_duration_sec");
+    let max_data_mb: u64 = runtime::get_named_arg("max_data_mb");
+    let amount: U512 = runtime::get_named_arg("amount");
+    let caller = runtime::get_caller();
+    let now: u64 = Into::<u64>::into(runtime::get_blocktime());
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let nonce_key = format!("nonce:{}", caller.to_string());
+    let nonce: u64 = read_dict(jobs_dict, &nonce_key).unwrap_or(0);
+    let next_nonce = nonce + 1;
+    write_dict(jobs_dict, &nonce_key, next_nonce);
+
+    let session_id = format!("session:{}:{}", caller.to_string(), nonce);
+    write_dict(jobs_dict, &format!("{}:consumer", session_id), caller);
+    write_dict(jobs_dict, &format!("{}:amount", session_id), amount);
+    write_dict(jobs_dict, &format!("{}:state", session_id), STATE_PENDING);
+    write_dict(jobs_dict, &format!("{}:created_at", session_id), now);
+    write_dict(jobs_dict, &format!("{}:max_duration_sec", session_id), max_duration_sec);
+    write_dict(jobs_dict, &format!("{}:max_data_mb", session_id), max_data_mb);
+    write_dict(jobs_dict, &format!("{}:consumer_pubkey", session_id), consumer_pubkey);
+    write_dict(jobs_dict, &format!("{}:resource_type", session_id), "bandwidth");
+
+    let pending_dict = get_dict(PENDING_JOBS);
+    let mut pending: Vec<String> = read_dict(pending_dict, "list").unwrap_or_default();
+    if !pending.contains(&session_id) {
+        pending.push(session_id.clone());
+        write_dict(pending_dict, "list", pending);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn create_allocation() {
+    let data_shards: u64 = runtime::get_named_arg("data_shards");
+    let parity_shards: u64 = runtime::get_named_arg("parity_shards");
+    let size_mb: u64 = runtime::get_named_arg("size_mb");
+    let expiry_ms: u64 = runtime::get_named_arg("expiry_ms");
+    let amount: U512 = runtime::get_named_arg("amount");
+    let caller = runtime::get_caller();
+    let now: u64 = Into::<u64>::into(runtime::get_blocktime());
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let nonce_key = format!("nonce:{}", caller.to_string());
+    let nonce: u64 = read_dict(jobs_dict, &nonce_key).unwrap_or(0);
+    let next_nonce = nonce + 1;
+    write_dict(jobs_dict, &nonce_key, next_nonce);
+
+    let alloc_id = format!("alloc:{}:{}", caller.to_string(), nonce);
+    write_dict(jobs_dict, &format!("{}:consumer", alloc_id), caller);
+    write_dict(jobs_dict, &format!("{}:amount", alloc_id), amount);
+    write_dict(jobs_dict, &format!("{}:state", alloc_id), STATE_PENDING);
+    write_dict(jobs_dict, &format!("{}:created_at", alloc_id), now);
+    write_dict(jobs_dict, &format!("{}:data_shards", alloc_id), data_shards);
+    write_dict(jobs_dict, &format!("{}:parity_shards", alloc_id), parity_shards);
+    write_dict(jobs_dict, &format!("{}:size_mb", alloc_id), size_mb);
+    write_dict(jobs_dict, &format!("{}:expiry_ms", alloc_id), expiry_ms);
+    write_dict(jobs_dict, &format!("{}:resource_type", alloc_id), "storage");
+
+    let pending_dict = get_dict(PENDING_JOBS);
+    let mut pending: Vec<String> = read_dict(pending_dict, "list").unwrap_or_default();
+    if !pending.contains(&alloc_id) {
+        pending.push(alloc_id.clone());
+        write_dict(pending_dict, "list", pending);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn store_file() {
+    let alloc_id: String = runtime::get_named_arg("alloc_id");
+    let file_hash: String = runtime::get_named_arg("file_hash");
+    let size_mb: u64 = runtime::get_named_arg("size_mb");
+    let amount: U512 = runtime::get_named_arg("amount");
+    let caller = runtime::get_caller();
+    let now: u64 = Into::<u64>::into(runtime::get_blocktime());
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let file_id = format!("file:{}:{}", alloc_id, now);
+    write_dict(jobs_dict, &format!("{}:consumer", file_id), caller);
+    write_dict(jobs_dict, &format!("{}:amount", file_id), amount);
+    write_dict(jobs_dict, &format!("{}:state", file_id), STATE_PENDING);
+    write_dict(jobs_dict, &format!("{}:created_at", file_id), now);
+    write_dict(jobs_dict, &format!("{}:alloc_id", file_id), alloc_id);
+    write_dict(jobs_dict, &format!("{}:file_hash", file_id), file_hash);
+    write_dict(jobs_dict, &format!("{}:size_mb", file_id), size_mb);
+    write_dict(jobs_dict, &format!("{}:resource_type", file_id), "storage");
+}
+
+#[no_mangle]
+pub extern "C" fn create_demand() {
+    let task_type: String = runtime::get_named_arg("task_type");
+    let runtime_str: String = runtime::get_named_arg("runtime");
+    let max_cost: U512 = runtime::get_named_arg("max_cost");
+    let duration_sec: u64 = runtime::get_named_arg("duration_sec");
+    let requires_gpu: bool = runtime::get_named_arg("requires_gpu");
+    let min_vram_mb: u64 = runtime::get_named_arg("min_vram_mb");
+    let caller = runtime::get_caller();
+    let now: u64 = Into::<u64>::into(runtime::get_blocktime());
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let nonce_key = format!("nonce:{}", caller.to_string());
+    let nonce: u64 = read_dict(jobs_dict, &nonce_key).unwrap_or(0);
+    let next_nonce = nonce + 1;
+    write_dict(jobs_dict, &nonce_key, next_nonce);
+
+    let demand_id = format!("demand:{}:{}", caller.to_string(), nonce);
+    write_dict(jobs_dict, &format!("{}:consumer", demand_id), caller);
+    write_dict(jobs_dict, &format!("{}:amount", demand_id), max_cost);
+    write_dict(jobs_dict, &format!("{}:state", demand_id), STATE_PENDING);
+    write_dict(jobs_dict, &format!("{}:created_at", demand_id), now);
+    write_dict(jobs_dict, &format!("{}:task_type", demand_id), task_type);
+    write_dict(jobs_dict, &format!("{}:runtime", demand_id), runtime_str);
+    write_dict(jobs_dict, &format!("{}:duration_sec", demand_id), duration_sec);
+    write_dict(jobs_dict, &format!("{}:requires_gpu", demand_id), requires_gpu);
+    write_dict(jobs_dict, &format!("{}:min_vram_mb", demand_id), min_vram_mb);
+    write_dict(jobs_dict, &format!("{}:resource_type", demand_id), "compute");
+
+    let pending_dict = get_dict(PENDING_JOBS);
+    let mut pending: Vec<String> = read_dict(pending_dict, "list").unwrap_or_default();
+    if !pending.contains(&demand_id) {
+        pending.push(demand_id.clone());
+        write_dict(pending_dict, "list", pending);
+    }
+}
+
+// ============ CANCEL / CLOSE ENTRY POINTS ============
+
+#[no_mangle]
+pub extern "C" fn remove_file() {
+    let caller = runtime::get_caller();
+    let file_id: String = runtime::get_named_arg("file_id");
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let consumer: AccountHash = read_dict(jobs_dict, &format!("{}:consumer", file_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    if consumer != caller {
+        runtime::revert(ApiError::User(3));
+    }
+
+    let state: u8 = read_dict(jobs_dict, &format!("{}:state", file_id))
+        .unwrap_or(STATE_REFUNDED);
+    if state == STATE_SETTLED || state == STATE_REFUNDED {
+        runtime::revert(ApiError::User(4));
+    }
+
+    let amount: U512 = read_dict(jobs_dict, &format!("{}:amount", file_id)).unwrap_or_default();
+    if amount > U512::from(0) {
+        let contract_purse = get_contract_purse();
+        system::transfer_from_purse_to_account(contract_purse, consumer, amount, None)
+            .unwrap_or_revert();
+    }
+    write_dict(jobs_dict, &format!("{}:state", file_id), STATE_REFUNDED);
+    let now: u64 = Into::<u64>::into(runtime::get_blocktime());
+    write_dict(jobs_dict, &format!("{}:removed_at", file_id), now);
+}
+
+#[no_mangle]
+pub extern "C" fn cancel_allocation() {
+    let caller = runtime::get_caller();
+    let alloc_id: String = runtime::get_named_arg("alloc_id");
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let consumer: AccountHash = read_dict(jobs_dict, &format!("{}:consumer", alloc_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    if consumer != caller {
+        runtime::revert(ApiError::User(3));
+    }
+
+    let state: u8 = read_dict(jobs_dict, &format!("{}:state", alloc_id))
+        .unwrap_or(STATE_REFUNDED);
+    if state != STATE_PENDING {
+        runtime::revert(ApiError::User(4));
+    }
+
+    let amount: U512 = read_dict(jobs_dict, &format!("{}:amount", alloc_id)).unwrap_or_default();
+    if amount > U512::from(0) {
+        let contract_purse = get_contract_purse();
+        system::transfer_from_purse_to_account(contract_purse, consumer, amount, None)
+            .unwrap_or_revert();
+    }
+    write_dict(jobs_dict, &format!("{}:state", alloc_id), STATE_REFUNDED);
+    write_dict(jobs_dict, &format!("{}:cancelled_at", alloc_id), Into::<u64>::into(runtime::get_blocktime()));
+}
+
+#[no_mangle]
+pub extern "C" fn cancel_demand() {
+    let caller = runtime::get_caller();
+    let demand_id: String = runtime::get_named_arg("demand_id");
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let consumer: AccountHash = read_dict(jobs_dict, &format!("{}:consumer", demand_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    if consumer != caller {
+        runtime::revert(ApiError::User(3));
+    }
+
+    let state: u8 = read_dict(jobs_dict, &format!("{}:state", demand_id))
+        .unwrap_or(STATE_REFUNDED);
+    if state != STATE_PENDING {
+        runtime::revert(ApiError::User(4));
+    }
+
+    let amount: U512 = read_dict(jobs_dict, &format!("{}:amount", demand_id)).unwrap_or_default();
+    if amount > U512::from(0) {
+        let contract_purse = get_contract_purse();
+        system::transfer_from_purse_to_account(contract_purse, consumer, amount, None)
+            .unwrap_or_revert();
+    }
+    write_dict(jobs_dict, &format!("{}:state", demand_id), STATE_REFUNDED);
+    write_dict(jobs_dict, &format!("{}:cancelled_at", demand_id), Into::<u64>::into(runtime::get_blocktime()));
+}
+
+#[no_mangle]
+pub extern "C" fn cancel_job() {
+    let caller = runtime::get_caller();
+    let job_id: String = runtime::get_named_arg("job_id");
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let consumer: AccountHash = read_dict(jobs_dict, &format!("{}:consumer", job_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    if consumer != caller {
+        runtime::revert(ApiError::User(3));
+    }
+
+    let state: u8 = read_dict(jobs_dict, &format!("{}:state", job_id))
+        .unwrap_or(STATE_REFUNDED);
+    if state != STATE_PENDING {
+        runtime::revert(ApiError::User(4));
+    }
+
+    let amount: U512 = read_dict(jobs_dict, &format!("{}:amount", job_id)).unwrap_or_default();
+    if amount > U512::from(0) {
+        let contract_purse = get_contract_purse();
+        system::transfer_from_purse_to_account(contract_purse, consumer, amount, None)
+            .unwrap_or_revert();
+    }
+    write_dict(jobs_dict, &format!("{}:state", job_id), STATE_REFUNDED);
+    write_dict(jobs_dict, &format!("{}:cancelled_at", job_id), Into::<u64>::into(runtime::get_blocktime()));
+}
+
+#[no_mangle]
+pub extern "C" fn close_session() {
+    let caller = runtime::get_caller();
+    let session_id: String = runtime::get_named_arg("session_id");
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let consumer: AccountHash = read_dict(jobs_dict, &format!("{}:consumer", session_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    if consumer != caller {
+        runtime::revert(ApiError::User(3));
+    }
+
+    let state: u8 = read_dict(jobs_dict, &format!("{}:state", session_id))
+        .unwrap_or(STATE_REFUNDED);
+    if state == STATE_SETTLED || state == STATE_REFUNDED {
+        runtime::revert(ApiError::User(4));
+    }
+
+    write_dict(jobs_dict, &format!("{}:state", session_id), STATE_SETTLED);
+    write_dict(jobs_dict, &format!("{}:closed_at", session_id), Into::<u64>::into(runtime::get_blocktime()));
+}
+
+// ============ RATE PROVIDER ============
+
+#[no_mangle]
+pub extern "C" fn rate_provider() {
+    let caller = runtime::get_caller();
+    let file_id: String = runtime::get_named_arg("file_id");
+    let session_id: String = runtime::get_named_arg("session_id");
+    let agreement_id: String = runtime::get_named_arg("agreement_id");
+    let rating: u64 = runtime::get_named_arg("rating");
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let ref_id = if !file_id.is_empty() { file_id }
+        else if !session_id.is_empty() { session_id }
+        else { agreement_id };
+
+    let consumer: AccountHash = read_dict(jobs_dict, &format!("{}:consumer", ref_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    if consumer != caller {
+        runtime::revert(ApiError::User(3));
+    }
+
+    write_dict(jobs_dict, &format!("{}:provider_rating", ref_id), rating);
+    write_dict(jobs_dict, &format!("{}:rated_at", ref_id), Into::<u64>::into(runtime::get_blocktime()));
+}
+
+// ============ DISPUTE ENTRY POINTS ============
+
+#[no_mangle]
+pub extern "C" fn dispute_session() {
+    let caller = runtime::get_caller();
+    let session_id: String = runtime::get_named_arg("session_id");
+    let evidence_hash: String = runtime::get_named_arg("evidence_hash");
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let consumer: AccountHash = read_dict(jobs_dict, &format!("{}:consumer", session_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    if consumer != caller {
+        runtime::revert(ApiError::User(3));
+    }
+
+    let state: u8 = read_dict(jobs_dict, &format!("{}:state", session_id))
+        .unwrap_or(STATE_REFUNDED);
+    if state == STATE_REFUNDED || state == STATE_SETTLED {
+        runtime::revert(ApiError::User(4));
+    }
+
+    write_dict(jobs_dict, &format!("{}:state", session_id), STATE_DISPUTED);
+    write_dict(jobs_dict, &format!("{}:evidence_hash", session_id), evidence_hash);
+    write_dict(jobs_dict, &format!("{}:dispute_initiator", session_id), caller);
+    write_dict(jobs_dict, &format!("{}:dispute_timestamp", session_id), Into::<u64>::into(runtime::get_blocktime()));
+}
+
+#[no_mangle]
+pub extern "C" fn dispute_file() {
+    let caller = runtime::get_caller();
+    let file_id: String = runtime::get_named_arg("file_id");
+    let evidence_hash: String = runtime::get_named_arg("evidence_hash");
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let consumer: AccountHash = read_dict(jobs_dict, &format!("{}:consumer", file_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    if consumer != caller {
+        runtime::revert(ApiError::User(3));
+    }
+
+    let state: u8 = read_dict(jobs_dict, &format!("{}:state", file_id))
+        .unwrap_or(STATE_REFUNDED);
+    if state == STATE_REFUNDED || state == STATE_SETTLED {
+        runtime::revert(ApiError::User(4));
+    }
+
+    write_dict(jobs_dict, &format!("{}:state", file_id), STATE_DISPUTED);
+    write_dict(jobs_dict, &format!("{}:evidence_hash", file_id), evidence_hash);
+    write_dict(jobs_dict, &format!("{}:dispute_initiator", file_id), caller);
+    write_dict(jobs_dict, &format!("{}:dispute_timestamp", file_id), Into::<u64>::into(runtime::get_blocktime()));
+}
+
+#[no_mangle]
+pub extern "C" fn dispute_agreement() {
+    let caller = runtime::get_caller();
+    let agreement_id: String = runtime::get_named_arg("agreement_id");
+    let evidence_hash: String = runtime::get_named_arg("evidence_hash");
+    let jobs_dict = get_dict(JOBS_DICT);
+
+    let consumer: AccountHash = read_dict(jobs_dict, &format!("{}:consumer", agreement_id))
+        .unwrap_or_revert_with(ApiError::User(2));
+    if consumer != caller {
+        runtime::revert(ApiError::User(3));
+    }
+
+    let state: u8 = read_dict(jobs_dict, &format!("{}:state", agreement_id))
+        .unwrap_or(STATE_REFUNDED);
+    if state == STATE_REFUNDED || state == STATE_SETTLED {
+        runtime::revert(ApiError::User(4));
+    }
+
+    write_dict(jobs_dict, &format!("{}:state", agreement_id), STATE_DISPUTED);
+    write_dict(jobs_dict, &format!("{}:evidence_hash", agreement_id), evidence_hash);
+    write_dict(jobs_dict, &format!("{}:dispute_initiator", agreement_id), caller);
+    write_dict(jobs_dict, &format!("{}:dispute_timestamp", agreement_id), Into::<u64>::into(runtime::get_blocktime()));
 }
 
 #[no_mangle]
@@ -616,12 +1317,64 @@ pub extern "C" fn call() {
     let reputation: AccountHash = runtime::get_named_arg("reputation");
     let owner: AccountHash = runtime::get_named_arg("owner");
     let protocol_fee_recipient: AccountHash = runtime::get_named_arg("protocol_fee_recipient");
+    let contract_name: String = runtime::get_named_arg("contract_name");
 
-    let dict_keys = ["ev2_jobs", "ev2_job_id_to_address", "ev2_consumer_jobs", "ev2_provider_jobs", "ev2_pending_jobs"];
+    let dict_keys = [
+        "ev2_jobs",
+        "ev2_job_id_to_address",
+        "ev2_consumer_jobs",
+        "ev2_provider_jobs",
+        "ev2_pending_jobs",
+        "ev2_challenges",
+        "ev4_jobs",
+        "ev4_job_id_to_address",
+        "ev4_consumer_jobs",
+        "ev4_provider_jobs",
+        "ev4_pending_jobs",
+        "ev4_challenges",
+        "escrow_vault",
+        "escrow_vault_hash",
+        "escrow_vault_package",
+        "escrow_vault_v2",
+        "escrow_vault_v2_hash",
+        "escrow_vault_v2_package",
+        "inference_market",
+        "inference_market_hash",
+        "inference_market_package",
+        "storage_market",
+        "storage_market_hash",
+        "storage_market_package",
+        "compute_market",
+        "compute_market_hash",
+        "compute_market_package",
+        "bandwidth_market",
+        "bandwidth_market_hash",
+        "bandwidth_market_package",
+        "compute_registry",
+        "reputation",
+        "owner",
+        "protocol_fee_recipient",
+        "protocol_fees",
+        "contract_purse",
+        "contract_purse_add",
+        "protocol_fee_bps",
+    ];
     for key in dict_keys.iter() {
         if runtime::has_key(key) {
             runtime::remove_key(key);
         }
+    }
+    // Clean up any existing keys for this specific contract_name
+    let hash_key_name = format!("{}_hash", contract_name);
+    let package_key_name = format!("{}_package", contract_name);
+    if runtime::has_key(&hash_key_name) {
+        runtime::remove_key(&hash_key_name);
+    }
+    if runtime::has_key(&package_key_name) {
+        runtime::remove_key(&package_key_name);
+    }
+    if runtime::has_key(&contract_name) {
+        runtime::remove_key(&contract_name);
     }
 
     let mut named_keys = NamedKeys::new();
@@ -636,18 +1389,21 @@ pub extern "C" fn call() {
     let add_only_purse = URef::new(contract_purse.addr(), AccessRights::ADD);
     named_keys.insert("contract_purse_add".to_string(), add_only_purse.into());
 
-    named_keys.insert(JOBS_DICT.to_string(), storage::new_dictionary("ev2_jobs").unwrap_or_revert().into());
-    named_keys.insert(JOB_ID_TO_ADDRESS.to_string(), storage::new_dictionary("ev2_job_id_to_address").unwrap_or_revert().into());
-    named_keys.insert(CONSUMER_JOBS.to_string(), storage::new_dictionary("ev2_consumer_jobs").unwrap_or_revert().into());
-    named_keys.insert(PROVIDER_JOBS.to_string(), storage::new_dictionary("ev2_provider_jobs").unwrap_or_revert().into());
-    named_keys.insert(PENDING_JOBS.to_string(), storage::new_dictionary("ev2_pending_jobs").unwrap_or_revert().into());
+    named_keys.insert(JOBS_DICT.to_string(), storage::new_dictionary("ev4_jobs").unwrap_or_revert().into());
+    named_keys.insert(JOB_ID_TO_ADDRESS.to_string(), storage::new_dictionary("ev4_job_id_to_address").unwrap_or_revert().into());
+    named_keys.insert(CONSUMER_JOBS.to_string(), storage::new_dictionary("ev4_consumer_jobs").unwrap_or_revert().into());
+    named_keys.insert(PROVIDER_JOBS.to_string(), storage::new_dictionary("ev4_provider_jobs").unwrap_or_revert().into());
+    named_keys.insert(PENDING_JOBS.to_string(), storage::new_dictionary("ev4_pending_jobs").unwrap_or_revert().into());
+    named_keys.insert(CHALLENGES_DICT.to_string(), storage::new_dictionary("ev4_challenges").unwrap_or_revert().into());
+    named_keys.insert(PROTOCOL_FEE_BPS.to_string(), storage::new_uref(0u64).into());
 
+    let hash_name = format!("{}_hash", contract_name);
     let (contract_hash, _) = storage::new_contract(
         create_entry_points(),
         Some(named_keys),
-        Some("escrow_vault".to_string()),
-        Some("escrow_vault_hash".to_string()),
+        Some(contract_name.clone()),
+        Some(hash_name.clone()),
         None,
     );
-    runtime::put_key("escrow_vault_hash", contract_hash.into());
+    runtime::put_key(&hash_name, contract_hash.into());
 }

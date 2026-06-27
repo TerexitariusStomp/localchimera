@@ -7,12 +7,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const CHAIN_NAME = 'casper-test';
-const RPC_URL = 'http://65.109.89.88:7777/rpc';
+const RPC_URL = 'https://node.testnet.casper.network/rpc';
 const PAYMENT = '10000000000'; // 10 CSPR
 const WASM_DIR = join(__dirname, '../contracts-casper/target/wasm32-unknown-unknown/release');
 
 function loadKey() {
-  const pem = readFileSync('/tmp/casper-keys/Account 1_secret_key.pem', 'utf-8');
+  const pem = readFileSync('/tmp/casper-wallet/Account 7_secret_key.pem', 'utf-8');
   return sdk.PrivateKey.fromPem(pem, sdk.KeyAlgorithm.SECP256K1);
 }
 

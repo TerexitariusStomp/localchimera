@@ -1,0 +1,4 @@
+/api/rpc/*  /api/rpc/[[path]]  200
+/inference/*  /inference/index.html   200
+/inference    /inference/index.html   200
+/*    /index.html   200

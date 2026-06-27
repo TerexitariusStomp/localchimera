@@ -1,0 +1,8 @@
+name = "new-localchimera"
+compatibility_date = "2024-12-01"
+
+[site]
+bucket = "./dist"
+
+[build]
+command = "npm run build"

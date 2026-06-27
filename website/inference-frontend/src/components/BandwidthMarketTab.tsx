@@ -1,26 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import EntryPointCard from './EntryPointCard';
-import { Button, Input, Card, Badge } from './ui';
-import { Send, Wifi, Users, RefreshCw, Pause, Play, Gavel, AlertTriangle, DollarSign } from 'lucide-react';
+import { Button, Input, StarRating } from './ui';
+import { Wifi, RefreshCw, Gavel, AlertTriangle, Shield, Star } from 'lucide-react';
 import type { TxRecord } from '../types';
 import * as sdk from 'casper-js-sdk';
 import { getContractNamedKeys, queryDictionary, callEntryPointWithWallet } from '../casper-client';
 
-function accountHashToBytes(hashStr: string): Uint8Array {
-  const bytes = new Uint8Array(32);
-  const hex = hashStr.replace('account-hash-', '');
-  for (let i = 0; i < 32; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
-  return bytes;
-}
+const ADMIN_PUBLIC_KEY = '020227d8dd5ccaa600e45b36e598d90ef8c26b6c67ef81bdfebde8fa583997a91ea5';
 
 const SESSION_STATUS: Record<string, string> = {
   '0': 'pending', '1': 'confirmed', '2': 'closed', '3': 'disputed', '4': 'resolved',
 };
 
-export default function BandwidthMarketTab({ provider, publicKeyHex, contractHash, accountHash, onTx }: {
-  provider: any; publicKeyHex: string; contractHash: string; accountHash: string; onTx: (tx: TxRecord) => void;
+export default function BandwidthMarketTab({ provider, publicKeyHex, contractHash, accountHash, onTx, view = 'tasker' }: {
+  provider: any; publicKeyHex: string; contractHash: string; accountHash: string; onTx: (tx: TxRecord) => void; view?: 'tasker' | 'provider';
 }) {
   const canSign = !!provider && !!publicKeyHex;
+  const isAdmin = publicKeyHex === ADMIN_PUBLIC_KEY;
+  const isTasker = view === 'tasker';
+  const isProvider = view === 'provider';
   const [loading, setLoading] = useState(false);
   const [namedKeys, setNamedKeys] = useState<Record<string, string>>({});
   const [providersList, setProvidersList] = useState<any[]>([]);
@@ -100,159 +98,46 @@ export default function BandwidthMarketTab({ provider, publicKeyHex, contractHas
         </button>
       </div>
 
-      {/* Providers */}
-      <Card className="p-4">
-        <h3 className="font-semibold flex items-center gap-2 mb-2"><Users className="h-4 w-4" />Bandwidth Providers</h3>
-        {providersList.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No bandwidth providers registered from this account.</p>
-        ) : (
-          <div className="space-y-2">
-            {providersList.map((p) => (
-              <div key={p.address} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
-                <div className="flex items-center gap-2">
-                  <span className={`inline-block h-2 w-2 rounded-full ${p.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                  <span className="font-medium">{p.name}</span>
-                  <Badge variant="default">{p.serviceType}</Badge>
-                  {p.isRelay && <Badge variant="warning">Relay</Badge>}
-                </div>
-                <div className="text-muted-foreground">{p.bandwidth} Mbps · {(Number(p.pricePerHour) / 1e9).toFixed(4)} CSPR/hr · {(Number(p.pricePerGib) / 1e9).toFixed(4)} CSPR/GiB</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Sessions */}
-      <Card className="p-4">
-        <h3 className="font-semibold flex items-center gap-2 mb-2"><Wifi className="h-4 w-4" />Sessions</h3>
-        {sessions.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No bandwidth sessions created.</p>
-        ) : (
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {sessions.map((s) => (
-              <div key={s.id} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
-                <div className="flex items-center gap-2">
-                  <Badge variant={s.status === 'closed' ? 'success' : s.status === 'disputed' ? 'error' : 'warning'}>{s.status}</Badge>
-                  <span className="font-mono">{s.id}</span>
-                </div>
-                <div className="text-muted-foreground">{s.maxDuration}s · {s.maxData} MB · {(Number(s.amount) / 1e9).toFixed(4)} CSPR</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Provider registration is automatic when the node starts */}
 
-        {/* Update Price */}
-        <EntryPointCard title="Update Pricing" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [pricePerHour, setPricePerHour] = useState('0.1');
-            const [pricePerGib, setPricePerGib] = useState('0.05');
-            const hourMotes = Math.floor(parseFloat(pricePerHour || '0') * 1e9).toString();
-            const gibMotes = Math.floor(parseFloat(pricePerGib || '0') * 1e9).toString();
-            return <form onSubmit={(e) => { e.preventDefault(); submit('update_provider_price', {
-              price_per_hour: sdk.CLValue.newCLUInt512(hourMotes),
-              price_per_gib: sdk.CLValue.newCLUInt512(gibMotes),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Update your bandwidth pricing.</div>
-              <Input label="Price/Hour (CSPR)" value={pricePerHour} onChange={setPricePerHour} />
-              <Input label="Price/GiB (CSPR)" value={pricePerGib} onChange={setPricePerGib} />
-              <Button type="submit" disabled={!canSign} className="w-full"><Send className="h-4 w-4 mr-1" />Update Pricing</Button>
-            </form>;
-          }}
-        </EntryPointCard>
+        {/* Provider pricing is set automatically — highest-paying tasks get routed first */}
 
-        {/* Create Session */}
-        <EntryPointCard title="Create Bandwidth Session" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Create Session — user-friendly: pick duration + data, provider auto-assigned */}
+        {isTasker && (<EntryPointCard title="Get Bandwidth" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {() => {
-            const [providerAddr, setProviderAddr] = useState('');
-            const [consumerPubkey, setConsumerPubkey] = useState('');
-            const [maxDuration, setMaxDuration] = useState('3600');
-            const [maxData, setMaxData] = useState('1024');
+            const [durationHours, setDurationHours] = useState('1');
+            const [dataGb, setDataGb] = useState('1');
             const [amount, setAmount] = useState('10');
+            const maxDuration = String(parseInt(durationHours || '0') * 3600);
+            const maxData = String(Math.floor(parseFloat(dataGb || '0') * 1024));
             const amountMotes = Math.floor(parseFloat(amount || '0') * 1e9).toString();
             const handleSubmit = async (e: any) => {
               e.preventDefault();
-              if (!canSign || !providerAddr.trim()) return;
+              if (!canSign) return;
               const result = await callEntryPointWithWallet(provider, publicKeyHex, contractHash, 'create_session', {
-                provider: sdk.CLValue.newCLByteArray(accountHashToBytes(providerAddr.replace('account-hash-', ''))),
-                consumer_pubkey: sdk.CLValue.newCLString(consumerPubkey || publicKeyHex),
-                max_duration_sec: sdk.CLValue.newCLUInt64(maxDuration),
-                max_data_mb: sdk.CLValue.newCLUInt64(maxData),
-                amount: sdk.CLValue.newCLUInt512(amountMotes),
+                consumer_pubkey: sdk.CLValue.newCLString(publicKeyHex),
+                max_duration_sec: sdk.CLValue.newCLUint64(maxDuration),
+                max_data_mb: sdk.CLValue.newCLUint64(maxData),
+                amount: sdk.CLValue.newCLUint512(amountMotes),
               });
               if (result.deployHash) {
                 onTx({ id: Date.now().toString(), deployHash: result.deployHash, entryPoint: 'create_session', contract: 'BandwidthMarket', status: result.error ? 'error' : 'pending', error: result.error });
               }
             };
             return <form onSubmit={handleSubmit} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Open a bandwidth session with a provider.</div>
-              <Input label="Provider Account Hash" value={providerAddr} onChange={setProviderAddr} placeholder="account-hash-..." />
-              <Input label="Consumer Public Key" value={consumerPubkey} onChange={setConsumerPubkey} placeholder="(defaults to your key)" />
-              <div className="grid grid-cols-2 gap-2">
-                <Input label="Max Duration (sec)" value={maxDuration} onChange={setMaxDuration} />
-                <Input label="Max Data (MB)" value={maxData} onChange={setMaxData} />
-              </div>
+              <div className="text-xs text-muted-foreground">Purchase bandwidth for a set duration and data allowance. The router automatically assigns the best available provider — higher-paying requests get routed first.</div>
+              <Input label="Duration (hours)" value={durationHours} onChange={setDurationHours} />
+              <Input label="Data Allowance (GB)" value={dataGb} onChange={setDataGb} />
               <Input label="Funds (CSPR)" value={amount} onChange={setAmount} />
-              <Button type="submit" disabled={!canSign || !providerAddr.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Create Session</Button>
+              <Button type="submit" disabled={!canSign} className="w-full"><Wifi className="h-4 w-4 mr-1" />Get Bandwidth</Button>
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Confirm Session */}
-        <EntryPointCard title="Confirm Session" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [sessionId, setSessionId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('confirm_session', {
-              session_id: sdk.CLValue.newCLString(sessionId),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Provider confirms a bandwidth session.</div>
-              <Input label="Session ID" value={sessionId} onChange={setSessionId} />
-              <Button type="submit" disabled={!canSign || !sessionId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Confirm</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Close Session */}
-        <EntryPointCard title="Close Session" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [sessionId, setSessionId] = useState('');
-            const [actualDuration, setActualDuration] = useState('3600');
-            const [actualData, setActualData] = useState('512');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('close_session', {
-              session_id: sdk.CLValue.newCLString(sessionId),
-              actual_duration_sec: sdk.CLValue.newCLUInt64(actualDuration),
-              actual_data_mb: sdk.CLValue.newCLUInt64(actualData),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Close a session with actual usage data.</div>
-              <Input label="Session ID" value={sessionId} onChange={setSessionId} />
-              <div className="grid grid-cols-2 gap-2">
-                <Input label="Actual Duration (sec)" value={actualDuration} onChange={setActualDuration} />
-                <Input label="Actual Data (MB)" value={actualData} onChange={setActualData} />
-              </div>
-              <Button type="submit" disabled={!canSign || !sessionId.trim()} className="w-full"><Send className="h-4 w-4 mr-1" />Close Session</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Claim Session Payment */}
-        <EntryPointCard title="Claim Session Payment" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => {
-            const [sessionId, setSessionId] = useState('');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('claim_session_payment', {
-              session_id: sdk.CLValue.newCLString(sessionId),
-            }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><DollarSign className="h-3 w-3" />Claim payment for a closed session (provider).</div>
-              <Input label="Session ID" value={sessionId} onChange={setSessionId} />
-              <Button type="submit" disabled={!canSign || !sessionId.trim()} className="w-full"><DollarSign className="h-4 w-4 mr-1" />Claim Payment</Button>
-            </form>;
-          }}
-        </EntryPointCard>
-
-        {/* Dispute Session */}
-        <EntryPointCard title="Dispute Session" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Dispute Session — tasker only */}
+        {isTasker && (<EntryPointCard title="Dispute Session" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [sessionId, setSessionId] = useState('');
             const [evidence, setEvidence] = useState('');
@@ -267,42 +152,90 @@ export default function BandwidthMarketTab({ provider, publicKeyHex, contractHas
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Resolve Dispute */}
-        <EntryPointCard title="Resolve Dispute (Admin)" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        {/* Rate Provider — consumer rates the bandwidth provider after session is closed */}
+        {isTasker && (<EntryPointCard title="Rate Provider" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {({ submit }) => {
             const [sessionId, setSessionId] = useState('');
-            const [consumerPct, setConsumerPct] = useState('50');
-            return <form onSubmit={(e) => { e.preventDefault(); submit('resolve_dispute', {
+            const [rating, setRating] = useState(0);
+            const closedSessions = sessions.filter(s => s.status === 'closed' || s.status === 'resolved');
+            return <form onSubmit={(e) => { e.preventDefault(); submit('rate_provider', {
               session_id: sdk.CLValue.newCLString(sessionId),
-              consumer_pct: sdk.CLValue.newCLUInt64(consumerPct),
+              rating: sdk.CLValue.newCLUint64(String(rating)),
             }); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground">Resolve a dispute with consumer payout percentage (owner only).</div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1"><Star className="h-3 w-3 text-[#00e5ff]" />Rate the bandwidth provider after session completion. Recorded on-chain.</div>
+              {closedSessions.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {closedSessions.map(s => (
+                    <button key={s.id} type="button" onClick={() => setSessionId(s.id)}
+                      className={`text-[10px] px-2 py-1 rounded font-mono ${sessionId === s.id ? 'bg-[#00e5ff]/20 text-[#00e5ff]' : 'bg-white/5 text-[#7a7468] hover:bg-white/10'}`}>
+                      {s.id}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Input label="Session ID" value={sessionId} onChange={setSessionId} />
-              <Input label="Consumer Payout (%)" value={consumerPct} onChange={setConsumerPct} />
-              <Button type="submit" disabled={!canSign || !sessionId.trim()} variant="outline" className="w-full"><Gavel className="h-4 w-4 mr-1" />Resolve</Button>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Provider Rating</label>
+                <StarRating value={rating} onChange={setRating} />
+              </div>
+              <Button type="submit" disabled={!canSign || !sessionId.trim() || rating === 0} className="w-full"><Star className="h-4 w-4 mr-1" />Rate Provider</Button>
             </form>;
           }}
         </EntryPointCard>
+        )}
 
-        {/* Pause/Resume */}
-        <EntryPointCard title="Pause Provider" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => (
-            <form onSubmit={(e) => { e.preventDefault(); submit('pause_provider', {}); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><Pause className="h-3 w-3" />Stop accepting sessions.</div>
-              <Button type="submit" disabled={!canSign} variant="danger" className="w-full"><Pause className="h-4 w-4 mr-1" />Pause</Button>
-            </form>
-          )}
+        {/* Rate Consumer — provider rates the consumer after session is closed */}
+        {isProvider && (<EntryPointCard title="Rate Consumer" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+          {({ submit }) => {
+            const [sessionId, setSessionId] = useState('');
+            const [rating, setRating] = useState(0);
+            const closedSessions = sessions.filter(s => s.status === 'closed' || s.status === 'resolved');
+            return <form onSubmit={(e) => { e.preventDefault(); submit('rate_consumer', {
+              session_id: sdk.CLValue.newCLString(sessionId),
+              rating: sdk.CLValue.newCLUint64(String(rating)),
+            }); }} className="space-y-2">
+              <div className="text-xs text-muted-foreground flex items-center gap-1"><Star className="h-3 w-3 text-[#00e5ff]" />Rate the consumer after bandwidth session completion. Recorded on-chain.</div>
+              {closedSessions.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {closedSessions.map(s => (
+                    <button key={s.id} type="button" onClick={() => setSessionId(s.id)}
+                      className={`text-[10px] px-2 py-1 rounded font-mono ${sessionId === s.id ? 'bg-[#00e5ff]/20 text-[#00e5ff]' : 'bg-white/5 text-[#7a7468] hover:bg-white/10'}`}>
+                      {s.id}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Input label="Session ID" value={sessionId} onChange={setSessionId} />
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Consumer Rating</label>
+                <StarRating value={rating} onChange={setRating} />
+              </div>
+              <Button type="submit" disabled={!canSign || !sessionId.trim() || rating === 0} className="w-full"><Star className="h-4 w-4 mr-1" />Rate Consumer</Button>
+            </form>;
+          }}
         </EntryPointCard>
+        )}
 
-        <EntryPointCard title="Resume Provider" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
-          {({ submit }) => (
-            <form onSubmit={(e) => { e.preventDefault(); submit('resume_provider', {}); }} className="space-y-2">
-              <div className="text-xs text-muted-foreground flex items-center gap-1"><Play className="h-3 w-3" />Resume accepting sessions.</div>
-              <Button type="submit" disabled={!canSign} className="w-full"><Play className="h-4 w-4 mr-1" />Resume</Button>
-            </form>
-          )}
-        </EntryPointCard>
+        {/* Admin only: Resolve Dispute */}
+        {isProvider && isAdmin && (
+          <EntryPointCard title="Resolve Dispute (Admin)" contract="BandwidthMarket" contractHash={contractHash} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+            {({ submit }) => {
+              const [sessionId, setSessionId] = useState('');
+              const [consumerPct, setConsumerPct] = useState('50');
+              return <form onSubmit={(e) => { e.preventDefault(); submit('resolve_dispute', {
+                session_id: sdk.CLValue.newCLString(sessionId),
+                consumer_pct: sdk.CLValue.newCLUInt64(consumerPct),
+              }); }} className="space-y-2">
+                <div className="text-xs text-muted-foreground flex items-center gap-1"><Shield className="h-3 w-3 text-[#00e5ff]" />Resolve a dispute with consumer payout percentage (admin only).</div>
+                <Input label="Session ID" value={sessionId} onChange={setSessionId} />
+                <Input label="Consumer Payout (%)" value={consumerPct} onChange={setConsumerPct} />
+                <Button type="submit" disabled={!canSign || !sessionId.trim()} variant="outline" className="w-full"><Gavel className="h-4 w-4 mr-1" />Resolve</Button>
+              </form>;
+            }}
+          </EntryPointCard>
+        )}
       </div>
     </div>
   );

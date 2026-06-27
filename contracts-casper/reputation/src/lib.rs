@@ -89,6 +89,13 @@ fn create_eps() -> EntryPoints {
     e.add_entry_point(EntityEntryPoint::new("set_escrow_vault",
         vec![Parameter::new("escrow_vault", AccountHash::cl_type())],
         CLType::Unit, EntryPointAccess::Public, EntryPointType::Called, EntryPointPayment::Caller));
+    e.add_entry_point(EntityEntryPoint::new("rate_consumer",
+        vec![
+            Parameter::new("consumer", AccountHash::cl_type()),
+            Parameter::new("rating", CLType::U64),
+            Parameter::new("job_id", CLType::String),
+        ],
+        CLType::Unit, EntryPointAccess::Public, EntryPointType::Called, EntryPointPayment::Caller));
     e
 }
 
@@ -153,6 +160,24 @@ pub extern "C" fn set_escrow_vault() {
     require_owner();
     let vault: AccountHash = runtime::get_named_arg("escrow_vault");
     runtime::put_key(ESCROW_VAULT, Key::Account(vault));
+}
+
+#[no_mangle]
+pub extern "C" fn rate_consumer() {
+    let caller = runtime::get_caller();
+    let consumer: AccountHash = runtime::get_named_arg("consumer");
+    let rating: u64 = runtime::get_named_arg("rating");
+    let job_id: String = runtime::get_named_arg("job_id");
+    let k = consumer.to_string();
+    let d = get_dict(CONSUMER_REP);
+
+    let count: u64 = read(d, &format!("{}:rating_count", k)).unwrap_or(0);
+    let total: u64 = read(d, &format!("{}:rating_total", k)).unwrap_or(0);
+    write(d, &format!("{}:rating_count", k), count + 1);
+    write(d, &format!("{}:rating_total", k), total + rating);
+    write(d, &format!("{}:last_rating", k), rating);
+    write(d, &format!("{}:last_job_id", k), job_id);
+    write(d, &format!("{}:rated_by", k), caller);
 }
 
 #[no_mangle]

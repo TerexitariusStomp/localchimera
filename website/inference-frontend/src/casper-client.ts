@@ -1,7 +1,10 @@
 // @ts-nocheck
 import * as sdk from 'casper-js-sdk';
 
-const RPC_URL = 'https://node.testnet.casper.network/rpc';
+const RPC_URL = typeof window !== 'undefined' && window.location?.origin
+  ? `${window.location.origin}/api/rpc`
+  : '/api/rpc';
+const FALLBACK_RPC = 'https://node.testnet.casper.network/rpc';
 const CHAIN_NAME = 'casper-test';
 
 export interface ContractConfig {
@@ -9,13 +12,17 @@ export interface ContractConfig {
   storageMarket: string;
   computeMarket: string;
   bandwidthMarket: string;
+  computeRegistry: string;
+  escrowVault: string;
 }
 
 export const CONTRACTS: ContractConfig = {
-  inferenceMarket: '116a2fa615c47c6cf027b3c8238cee265cb5271cdc8398fa98452ccaaf11d8d9',
-  storageMarket: '8b8b61ff8b5792c920e4dcda6a4a1357a01ccbec1339d7106fd1db67eeced49c',
-  computeMarket: 'ee722f68272a3f50d913b645474ccff5c5ba1281f2f14d6dae925480c1931bad',
-  bandwidthMarket: 'a69dc20172f48f6193b3aa9e653c663e91386ca923073fccc965eb0a1d5538ea',
+  inferenceMarket: 'd19feffe13c397aaeee6278c2789b886ea978e681ac36eafdfecf8caaa0de0fc',
+  storageMarket: '9ebcfa010b03d558bd2100ea47b65c5e3fdbb7a51a32f7288b383cdd0318911f',
+  computeMarket: '3317e67a53dce2277ed3be64b78a94abf87f2dea97e7456bc59045faa9d7e533',
+  bandwidthMarket: 'a8c075a8724264c3a28fc662f51a427c53ece4e271e692ac03bb88654be6058a',
+  computeRegistry: 'bed17bda7a3597725a5d19531faae67bd2f68f08be17d02ea36a6830be2fc152',
+  escrowVault: '0000000000000000000000000000000000000000000000000000000000000000',
 };
 
 let rpcClient: any = null;
@@ -448,4 +455,38 @@ export async function queryDictionary(uref: string, key: string): Promise<any> {
 
 export async function queryDictionaryItem(uref: string, key: string): Promise<any> {
   return queryDictionary(uref, key);
+}
+
+export async function getRegisteredProviders(contractHash: string): Promise<{
+  address: string; peerId: string; name: string; model: string; status: string; stake: string;
+}[]> {
+  try {
+    const namedKeys = await queryContractNamedKeys(contractHash);
+    const findUref = (name: string) => namedKeys.find(nk => nk.name === name)?.key.replace(/^uref-/, '').replace(/-\d{3}$/, '');
+    const statusUref = findUref('providers_status');
+    const peerIdUref = findUref('providers_peer_id');
+    const nameUref = findUref('providers_name');
+    const stakesUref = findUref('stakes');
+    const listUref = findUref('providers_list');
+    if (!statusUref || !listUref) return [];
+
+    const listRaw = await queryDictionary(`uref-${listUref}-000`, 'list');
+    if (!listRaw) return [];
+
+    const providers: { address: string; peerId: string; name: string; model: string; status: string; stake: string }[] = [];
+    const accountHashes: string[] = listRaw.split(',').filter(Boolean);
+    for (const ah of accountHashes) {
+      const dictKey = ah;
+      const status = await queryDictionary(`uref-${statusUref}-007`, dictKey);
+      const peerId = await queryDictionary(`uref-${peerIdUref}-007`, dictKey);
+      const name = await queryDictionary(`uref-${nameUref}-007`, dictKey);
+      const stake = await queryDictionary(`uref-${stakesUref}-007`, dictKey);
+      const statusStr = status === 1 ? 'active' : status === 2 ? 'paused' : status === 3 ? 'slashed' : 'unregistered';
+      providers.push({ address: ah, peerId: peerId || '', name: name || '', model: '', status: statusStr, stake: stake || '0' });
+    }
+    return providers;
+  } catch (e: any) {
+    console.error('[getRegisteredProviders] error:', e.message);
+    return [];
+  }
 }
