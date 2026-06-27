@@ -412,24 +412,34 @@ export class CasperEscrowBridge {
   async _runOllama(prompt) {
     const ollamaUrl = this.config.ollamaUrl || process.env.OLLAMA_URL || 'http://localhost:11434';
     const ollamaModel = this.config.ollamaModel || process.env.OLLAMA_MODEL || 'llama3.2:1b';
-    this.logger.info(`Trying Ollama at ${ollamaUrl} (model: ${ollamaModel})`);
+    const maxTokens = this.config.ollamaMaxTokens || parseInt(process.env.OLLAMA_MAX_TOKENS || '256', 10);
+    const timeoutMs = this.config.ollamaTimeoutMs || parseInt(process.env.OLLAMA_TIMEOUT_MS || '180000', 10);
+    this.logger.info(`Trying Ollama at ${ollamaUrl} (model: ${ollamaModel}, maxTokens: ${maxTokens}, timeout: ${timeoutMs}ms)`);
 
-    const res = await fetch(`${ollamaUrl}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: ollamaModel,
-        prompt: String(prompt),
-        stream: false,
-        options: { temperature: 0.7, num_predict: 512 },
-      }),
-    });
-    if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
-    const data = await res.json();
-    const output = (data.response || '').trim();
-    if (!output) throw new Error('Ollama returned empty response');
-    this.logger.info(`Ollama inference completed: ${output.slice(0, 100)}...`);
-    return { output, success: true, tokensGenerated: data.eval_count || 0, durationMs: data.total_duration || 0 };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(`${ollamaUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: ollamaModel,
+          prompt: String(prompt),
+          stream: false,
+          options: { temperature: 0.7, num_predict: maxTokens },
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
+      const data = await res.json();
+      const output = (data.response || '').trim();
+      if (!output) throw new Error('Ollama returned empty response');
+      this.logger.info(`Ollama inference completed: ${output.slice(0, 100)}...`);
+      return { output, success: true, tokensGenerated: data.eval_count || 0, durationMs: data.total_duration || 0 };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   computeHash(str) {

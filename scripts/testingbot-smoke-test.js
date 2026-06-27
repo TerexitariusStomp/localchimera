@@ -59,12 +59,17 @@ async function runSingleAttempt() {
     await browser.saveScreenshot(path.join(__dirname, 'screenshot-01-launch.png'));
     console.log('Screenshot 1: app launch');
 
-    // Capture early logcat to see app startup/crash
+    // Capture page source and logcat for debugging
+    try {
+      const pageSource = await browser.getPageSource();
+      fs.writeFileSync(path.join(__dirname, 'page-source.xml'), pageSource);
+      console.log('Saved page source');
+    } catch (e) { console.log('Could not save page source:', e.message); }
+
     try {
       const earlyLogcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '-t', '5000'] });
       fs.writeFileSync(path.join(__dirname, 'logcat-early.txt'), earlyLogcat || '(empty)');
-      console.log('Saved early logcat to logcat-early.txt');
-      // Print filtered lines to console
+      console.log('Saved early logcat');
       const lines = (earlyLogcat || '').split('\n');
       const appLines = lines.filter(l => 
         l.includes('chimera') || l.includes('ReactNative') || l.includes('com.facebook') || 
@@ -74,8 +79,8 @@ async function runSingleAttempt() {
       appLines.forEach(l => console.log(l));
       console.log('=== END APP LOGCAT ===\n');
     } catch (e) { 
-      console.log('Could not capture early logcat:', e.message);
-      fs.writeFileSync(path.join(__dirname, 'logcat-early.txt'), 'Error: ' + e.message);
+      console.log('Could not capture logcat:', e.message);
+      try { fs.writeFileSync(path.join(__dirname, 'logcat-early.txt'), 'Error: ' + e.message); } catch(e2) {}
     }
 
     // App now shows WebView immediately — no native setup screen
