@@ -59,6 +59,14 @@ async function runSingleAttempt() {
     await browser.saveScreenshot(path.join(__dirname, 'screenshot-01-launch.png'));
     console.log('Screenshot 1: app launch');
 
+    // Capture early logcat to see app startup/crash
+    try {
+      const earlyLogcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '-t', '2000'] });
+      console.log('\n=== EARLY LOGCAT ===');
+      console.log(earlyLogcat || '(empty)');
+      console.log('=== END EARLY LOGCAT ===\n');
+    } catch (e) { console.log('Could not capture early logcat:', e.message); }
+
     // App now shows WebView immediately — no native setup screen
     // Wait for WebView to appear and verify wiki content
     const startTime = Date.now();
@@ -144,12 +152,12 @@ async function runSingleAttempt() {
     }
 
     try {
-      const logcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '-t', '500'] });
+      const logcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '-t', '2000'] });
       fs.writeFileSync(path.join(__dirname, 'logcat.txt'), logcat || '(empty)');
       console.log('Logcat saved to logcat.txt');
       // Print logcat to CI console for debugging
       if (logcat) {
-        console.log('\n=== LOGCAT (last 500 lines) ===');
+        console.log('\n=== LOGCAT (last 2000 lines) ===');
         console.log(logcat);
         console.log('=== END LOGCAT ===\n');
       }
