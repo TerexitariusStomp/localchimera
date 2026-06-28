@@ -113,10 +113,22 @@ export class CasperEscrowBridge {
       this.logger.warn(`Could not reach Casper RPC: ${e.message}`);
     }
 
-    const pem = this.config.providerKeyPem || process.env.CASPER_PROVIDER_KEY_PEM;
+    let pem = this.config.providerKeyPem || process.env.CASPER_PROVIDER_KEY_PEM;
+    const pemPath = process.env.CASPER_PROVIDER_KEY_PEM_PATH;
+    if (!pem && pemPath) {
+      try {
+        const { readFileSync } = await import('fs');
+        pem = readFileSync(pemPath, 'utf8');
+      } catch (e) {
+        this.logger.error(`Cannot read key file ${pemPath}: ${e.message}`);
+        return;
+      }
+    }
     if (pem) {
       try {
-        this.providerKey = PrivateKey.fromPem(pem, KeyAlgorithm.SECP256K1);
+        // Handle escaped newlines from .env files
+        const cleanPem = pem.includes('\\n') ? pem.replace(/\\n/g, '\n') : pem;
+        this.providerKey = PrivateKey.fromPem(cleanPem, KeyAlgorithm.SECP256K1);
         this.providerAccountHash = this.providerKey.publicKey.accountHash().toHex();
         this.logger.info(`Provider account: ${this.providerAccountHash}`);
       } catch (e) {

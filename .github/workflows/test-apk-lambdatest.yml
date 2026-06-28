@@ -2,6 +2,8 @@ name: Test APK on LambdaTest
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
   release:
     types: [published]
 
@@ -16,10 +18,32 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Download latest APK
+      - name: Download latest release APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -sL -o chimera.apk \
-            "https://github.com/LocalChimera/localchimera/releases/download/v0.1.0-build.35/app-arm64-v8a-release.apk"
+          AUTH="Authorization: token $GH_TOKEN"
+          APK_URL=$(curl -s -H "$AUTH" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/LocalChimera/localchimera/releases?per_page=20" \
+            | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          withAssets = [r for r in data if r.get('assets')]
+          withAssets.sort(key=lambda r: r['created_at'], reverse=True)
+          for rel in withAssets:
+            for a in rel['assets']:
+              if 'x86_64' in a['name'].lower() and a['name'].endswith('.apk') and 'debug' not in a['name'].lower():
+                print(a['browser_download_url'])
+                sys.exit(0)
+          for rel in withAssets:
+            for a in rel['assets']:
+              if 'arm64' in a['name'].lower() and a['name'].endswith('.apk') and 'debug' not in a['name'].lower():
+                print(a['browser_download_url'])
+                sys.exit(0)
+          ")
+          echo "Downloading APK from: $APK_URL"
+          curl -s -L -H "$AUTH" -o chimera.apk "$APK_URL"
+          echo "Downloaded APK:"
           ls -lh chimera.apk
 
       - name: Upload APK to LambdaTest
@@ -34,12 +58,20 @@ jobs:
             -F "type=android" \
             -F "name=chimera.apk")
           echo "Upload response: $RESPONSE"
-          APP_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['app_id'])")
+          APP_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('app_id') or d.get('APP_URL') or d.get('app_url') or '')")
           echo "app_id=$APP_ID" >> "$GITHUB_OUTPUT"
+          echo "App ID: $APP_ID"
 
       - name: Install test dependencies
         run: npm install webdriverio
         working-directory: scripts
+
+      - name: Create placeholder output files
+        run: |
+          touch scripts/screenshot-01-launch.png 2>/dev/null || true
+          echo "(not captured)" > scripts/logcat-early.txt
+          echo "(not captured)" > scripts/logcat.txt
+          echo "(not captured)" > scripts/page-source.xml
 
       - name: Run smoke test on LambdaTest real device
         env:
@@ -50,9 +82,19 @@ jobs:
         run: node lambdatest-smoke-test.js
         working-directory: scripts
 
-      - name: Upload test screenshots
+      - name: List test output files
+        if: always()
+        run: |
+          echo "=== Files in scripts/ ==="
+          ls -la scripts/screenshot-*.png scripts/logcat*.txt scripts/page-source*.xml 2>&1 || echo "No matching files"
+
+      - name: Upload test screenshots and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lambdatest-screenshots
-          path: scripts/screenshot-*.png
+          path: |
+            scripts/screenshot-*.png
+            scripts/logcat*.txt
+            scripts/page-source*.xml
+          if-no-files-found: ignore

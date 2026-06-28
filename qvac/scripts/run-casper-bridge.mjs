@@ -10,13 +10,19 @@ async function main() {
   console.log('routes them to the QVAC inference layer, and completes the payment flow.');
   console.log('');
 
-  // Load config
+  // Load config — support inline PEM or file path
+  let providerKeyPem = process.env.CASPER_PROVIDER_KEY_PEM;
+  if (!providerKeyPem && process.env.CASPER_PROVIDER_KEY_PEM_PATH) {
+    const { readFileSync } = await import('fs');
+    providerKeyPem = readFileSync(process.env.CASPER_PROVIDER_KEY_PEM_PATH, 'utf8');
+  }
+
   const bridgeConfig = {
-    providerKeyPem: process.env.CASPER_PROVIDER_KEY_PEM,
+    providerKeyPem,
   };
 
   if (!bridgeConfig.providerKeyPem) {
-    console.error('ERROR: CASPER_PROVIDER_KEY_PEM not set in .env');
+    console.error('ERROR: CASPER_PROVIDER_KEY_PEM or CASPER_PROVIDER_KEY_PEM_PATH not set in .env');
     process.exit(1);
   }
 

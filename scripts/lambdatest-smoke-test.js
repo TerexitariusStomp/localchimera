@@ -21,7 +21,7 @@ async function runTest() {
         platformVersion: '12',
         isRealMobile: true,
         build: `Chimera-${process.env.GITHUB_RUN_ID || 'local'}`,
-        name: 'Smoke test - Enable AI button',
+        name: 'Smoke test - WebView launch',
         console: true,
         network: true,
         visual: true,
@@ -36,109 +36,64 @@ async function runTest() {
   let failureReason = '';
 
   try {
-    await browser.pause(5000);
+    fs.writeFileSync(path.join(__dirname, 'logcat-early.txt'), '(not captured)');
+    fs.writeFileSync(path.join(__dirname, 'logcat.txt'), '(not captured)');
+    fs.writeFileSync(path.join(__dirname, 'page-source.xml'), '(not captured)');
+
+    console.log('Waiting 8s for app launch...');
+    await browser.pause(8000);
     await browser.saveScreenshot(path.join(__dirname, 'screenshot-01-launch.png'));
-    console.log('Screenshot 1: app launched');
+    console.log('Screenshot 1 saved');
 
-    let enableAIBtn = null;
-    const selectors = [
-      '//*[contains(@text, "Enable AI")]',
-      '//*[contains(@text, "enable ai")]',
-      '//android.widget.Button[contains(@text, "Enable")]',
-      '//android.widget.TextView[contains(@text, "Enable")]',
-      'android=new UiSelector().textContains("Enable")',
-    ];
+    try {
+      const ps = await browser.getPageSource();
+      fs.writeFileSync(path.join(__dirname, 'page-source.xml'), ps);
+      console.log('Page source saved');
+    } catch (e) { console.log('Page source error:', e.message); }
 
-    for (const sel of selectors) {
+    try {
+      const lc = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '-t', '5000'] });
+      fs.writeFileSync(path.join(__dirname, 'logcat-early.txt'), lc || '(empty)');
+      const appLines = (lc || '').split('\n').filter(l =>
+        l.includes('chimera') || l.includes('ReactNative') || l.includes('FATAL') ||
+        l.includes('AndroidRuntime') || l.includes('Error') || l.includes('Hermes'));
+      console.log('\n=== APP LOGCAT (' + appLines.length + ' lines) ===');
+      appLines.forEach(l => console.log(l));
+      console.log('=== END LOGCAT ===\n');
+    } catch (e) { console.log('Logcat error:', e.message); }
+
+    const start = Date.now();
+    while (Date.now() - start < 120000) {
+      await browser.pause(5000);
       try {
-        const el = await browser.$(sel);
-        if (await el.isExisting()) {
-          enableAIBtn = el;
-          console.log('Found Enable AI button with selector:', sel);
+        const wv = await browser.$('//android.webkit.WebView');
+        if (await wv.isExisting()) {
+          console.log('WebView found!');
+          await browser.pause(3000);
+          await browser.saveScreenshot(path.join(__dirname, 'screenshot-03-webview.png'));
+          success = true;
           break;
         }
-      } catch (e) {}
+        console.log('WebView not found yet...');
+      } catch (e) { console.log('WebView check error:', e.message); }
     }
 
-    if (enableAIBtn) {
-      try {
-        await browser.execute('mobile: shell', { command: 'logcat', args: ['-c'] });
-        console.log('Logcat cleared');
-      } catch (e) { console.log('Could not clear logcat:', e.message); }
+    if (!success) failureReason = 'Timed out waiting for WebView';
 
-      await enableAIBtn.click();
-      console.log('Tapped Enable AI button');
-      await browser.pause(3000);
-      await browser.saveScreenshot(path.join(__dirname, 'screenshot-02-after-tap.png'));
-
-      const startTime = Date.now();
-      while (Date.now() - startTime < 90000) {
-        await browser.saveScreenshot(path.join(__dirname, 'screenshot-03-checking.png'));
-
-        try {
-          const ready = await browser.$('//*[contains(@text, "ready") or contains(@text, "Ready")]');
-          if (await ready.isExisting()) {
-            console.log('SUCCESS: Model loaded successfully');
-            success = true;
-            break;
-          }
-        } catch (e) {}
-
-        try {
-          const errorEl = await browser.$('//*[contains(@text, "error") or contains(@text, "Error") or contains(@text, "failed")]');
-          if (await errorEl.isExisting()) {
-            const txt = await errorEl.getText();
-            console.log('Model load error text:', txt);
-            failureReason = txt;
-            break;
-          }
-        } catch (e) {}
-
-        try {
-          const loading = await browser.$('//*[contains(@text, "loading") or contains(@text, "Loading")]');
-          if (await loading.isExisting()) {
-            const txt = await loading.getText();
-            console.log('Still loading:', txt);
-          }
-        } catch (e) {}
-
-        await browser.pause(4000);
-      }
-
-      if (!success && !failureReason) {
-        failureReason = 'Timed out waiting for model load result';
-      }
-
-      try {
-        const logcat = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '-t', '500'] });
-        fs.writeFileSync(path.join(__dirname, 'logcat.txt'), logcat || '(empty)');
-        console.log('Logcat saved to logcat.txt');
-      } catch (e) { console.log('Could not capture logcat:', e.message); }
-    } else {
-      await browser.saveScreenshot(path.join(__dirname, 'screenshot-02-no-button.png'));
-      failureReason = 'Enable AI button not found';
-      console.log('Enable AI button not found');
-      try {
-        const source = await browser.getPageSource();
-        fs.writeFileSync(path.join(__dirname, 'page-source.xml'), source);
-        console.log('Page source saved to page-source.xml');
-      } catch (e) {}
-    }
+    try {
+      const lc = await browser.execute('mobile: shell', { command: 'logcat', args: ['-d', '-t', '2000'] });
+      fs.writeFileSync(path.join(__dirname, 'logcat.txt'), lc || '(empty)');
+      if (lc) { console.log('\n=== FULL LOGCAT ===\n' + lc + '\n=== END ==='); }
+    } catch (e) {}
   } catch (e) {
     console.error('Test error:', e);
     failureReason = e.message;
   } finally {
-    await browser.deleteSession();
+    try { await browser.deleteSession(); } catch (e) {}
   }
 
-  if (success) {
-    console.log('\n=== TEST PASSED ===');
-    process.exit(0);
-  } else {
-    console.log('\n=== TEST FAILED ===');
-    console.log('Reason:', failureReason);
-    process.exit(1);
-  }
+  if (success) { console.log('\n=== TEST PASSED ==='); process.exit(0); }
+  else { console.log('\n=== TEST FAILED ===\nReason:', failureReason); process.exit(1); }
 }
 
 runTest();

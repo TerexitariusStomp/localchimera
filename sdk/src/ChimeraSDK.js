@@ -15,6 +15,9 @@ import { BttAiMinerProvider } from './miners/BttAiMinerProvider.js';
 import { GolemProvider } from './miners/GolemProvider.js';
 import { AnyoneProtocolProvider } from './miners/AnyoneProtocolProvider.js';
 import { MysteriumProvider } from './miners/MysteriumProvider.js';
+import { AkashProvider } from './miners/AkashProvider.js';
+import { TargonProvider } from './miners/TargonProvider.js';
+import { CessProvider } from './miners/CessProvider.js';
 import { KeyringManager } from './miners/KeyringManager.js';
 import { WalletSetup } from './miners/WalletSetup.js';
 
@@ -139,11 +142,12 @@ export class ChimeraSDK {
   }
 
   /**
-   * Initialize external providers (BTFS, ZCN, BTT AI, Golem, Anyone Protocol, Mysterium).
-   * Untrusted-safe providers (Golem, Anyone Protocol, Mysterium, BTT AI):
+   * Initialize external providers.
+   *
+   * Untrusted-safe providers (Golem, Anyone Protocol, Mysterium, BTT AI, CESS):
    *   run in Docker with no local private keys in SDK.
-   * Self-managed providers (BTFS, ZCN):
-   *   require local wallet setup before use on untrusted hardware.
+   * Self-managed providers (BTFS, ZCN, Akash, Targon):
+   *   require local wallet/keyring setup before use on untrusted hardware.
    */
   async _initExternalProviders() {
     // Storage providers — self-managed, require local wallet setup
@@ -165,6 +169,16 @@ export class ChimeraSDK {
       logger.warn(`[${this.appName}] 0Chain provider init failed: ${err.message}`);
     }
 
+    // CESS storage node (Docker-based, no local keys in SDK)
+    try {
+      const cess = new CessProvider();
+      await cess.init();
+      this.externalProviders.push(cess);
+      logger.info(`[${this.appName}] CESS storage provider ready`);
+    } catch (err) {
+      logger.warn(`[${this.appName}] CESS provider init failed: ${err.message}`);
+    }
+
     // GPU tasking network (vLLM/SGLang inference miner)
     try {
       const btt = new BttAiMinerProvider();
@@ -183,6 +197,26 @@ export class ChimeraSDK {
       logger.info(`[${this.appName}] Golem provider ready`);
     } catch (err) {
       logger.warn(`[${this.appName}] Golem init failed: ${err.message}`);
+    }
+
+    // Akash provider node (self-managed, uses OS keyring)
+    try {
+      const akash = new AkashProvider();
+      await akash.init();
+      this.externalProviders.push(akash);
+      logger.info(`[${this.appName}] Akash provider ready`);
+    } catch (err) {
+      logger.warn(`[${this.appName}] Akash provider init failed: ${err.message}`);
+    }
+
+    // Targon compute provider (self-managed, uses local config file)
+    try {
+      const targon = new TargonProvider();
+      await targon.init();
+      this.externalProviders.push(targon);
+      logger.info(`[${this.appName}] Targon provider ready`);
+    } catch (err) {
+      logger.warn(`[${this.appName}] Targon provider init failed: ${err.message}`);
     }
 
     // Onion routing relay (Docker-based, no keys)
