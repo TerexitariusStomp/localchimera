@@ -34,8 +34,8 @@ splits_block = """    splits {
         abi {
             enable true
             reset()
-            include "arm64-v8a", "armeabi-v7a"
-            universalApk false
+            include "arm64-v8a", "armeabi-v7a", "x86_64"
+            universalApk true
         }
     }"""
 if 'splits' not in content:

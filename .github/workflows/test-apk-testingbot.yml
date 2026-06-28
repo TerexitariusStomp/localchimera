@@ -32,6 +32,13 @@ jobs:
           withAssets.sort(key=lambda r: r['created_at'], reverse=True)
           for rel in withAssets:
             for a in rel['assets']:
+              # Prefer universal debug APK for testing (works on x86_64 emulator)
+              if 'universal' in a['name'].lower() and a['name'].endswith('.apk'):
+                print(a['browser_download_url'])
+                sys.exit(0)
+          # Fallback to arm64 release APK
+          for rel in withAssets:
+            for a in rel['assets']:
               if 'arm64' in a['name'].lower() and a['name'].endswith('.apk') and 'debug' not in a['name'].lower():
                 print(a['browser_download_url'])
                 sys.exit(0)

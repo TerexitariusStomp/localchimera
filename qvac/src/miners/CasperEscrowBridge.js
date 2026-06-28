@@ -452,59 +452,75 @@ export class CasperEscrowBridge {
     let stderr = '';
     let exitCode = 0;
 
-    try {
-      if (runtime === 'shell') {
-        const { execSync } = await import('child_process');
-        try {
-          stdout = execSync(code, {
-            timeout: timeoutMs,
-            encoding: 'utf8',
-            maxBuffer: 1024 * 512,
-            killSignal: 'SIGKILL',
-          }).trim();
-        } catch (execErr) {
-          stdout = (execErr.stdout || '').trim();
-          stderr = (execErr.stderr || '').trim();
-          exitCode = execErr.status || 1;
-        }
-      } else if (runtime === 'wasm') {
-        // Try running as a shell command that invokes a wasm runtime
-        const { execSync } = await import('child_process');
-        try {
-          stdout = execSync(code, {
-            timeout: timeoutMs,
-            encoding: 'utf8',
-            maxBuffer: 1024 * 512,
-            killSignal: 'SIGKILL',
-          }).trim();
-        } catch (execErr) {
-          stdout = (execErr.stdout || '').trim();
-          stderr = (execErr.stderr || '').trim();
-          exitCode = execErr.status || 1;
-        }
-      } else if (runtime === 'docker') {
-        // Docker execution — run in a container with resource limits
-        const { execSync } = await import('child_process');
-        const dockerCmd = `docker run --rm --memory=${ramMb}m --cpus=${cpuCores} --network=none --timeout=${timeoutSec}m alpine:latest sh -c '${code.replace(/'/g, "'\\''")}'`;
-        try {
-          stdout = execSync(dockerCmd, {
-            timeout: timeoutMs + 10000,
-            encoding: 'utf8',
-            maxBuffer: 1024 * 512,
-            killSignal: 'SIGKILL',
-          }).trim();
-        } catch (execErr) {
-          stdout = (execErr.stdout || '').trim();
-          stderr = (execErr.stderr || '').trim();
-          exitCode = execErr.status || 1;
-        }
-      } else {
-        stdout = `Unsupported runtime: ${runtime}`;
-        exitCode = 1;
-      }
-    } catch (e) {
-      stderr = e.message;
+    // Build the actual command based on runtime
+    let cmd = null;
+    const { execSync, spawn } = await import('child_process');
+    const fs = await import('fs');
+    const os = await import('os');
+
+    if (runtime === 'shell') {
+      cmd = code;
+    } else if (runtime === 'python3' || runtime === 'python') {
+      const tmpFile = `/tmp/chimera-compute-${Date.now()}.py`;
+      fs.writeFileSync(tmpFile, code);
+      cmd = `python3 ${tmpFile}`;
+    } else if (runtime === 'node' || runtime === 'javascript' || runtime === 'js') {
+      const tmpFile = `/tmp/chimera-compute-${Date.now()}.js`;
+      fs.writeFileSync(tmpFile, code);
+      cmd = `node ${tmpFile}`;
+    } else if (runtime === 'docker') {
+      const dockerCmd = `docker run --rm --memory=${ramMb}m --cpus=${cpuCores} --network=none alpine:latest sh -c '${code.replace(/'/g, "'\\''")}'`;
+      cmd = dockerCmd;
+    } else {
+      stdout = `Unsupported runtime: ${runtime}. Supported: shell, python3, node, docker`;
       exitCode = 1;
+    }
+
+    if (cmd) {
+      // Apply resource limits:
+      // - ulimit -v works for shell/python3 but NOT node (V8 needs ~1.5GB virtual address space)
+      // - For node, use --max-old-space-size to limit heap
+      // - timeout command enforces wall-clock timeout for all runtimes
+      const memKb = parseInt(ramMb, 10) * 1024;
+      let wrappedCmd;
+
+      if (runtime === 'node' || runtime === 'javascript' || runtime === 'js') {
+        // Node: use --max-old-space-size (in MB) instead of ulimit -v
+        const heapMb = Math.max(parseInt(ramMb, 10) - 64, 64); // leave 64MB for non-heap
+        // Rewrite the node command to include the flag
+        cmd = `node --max-old-space-size=${heapMb} ${cmd.split(' ')[1] || ''}`;
+        wrappedCmd = `timeout ${timeoutSec} ${cmd}`;
+      } else if (runtime === 'docker') {
+        // Docker handles its own resource limits
+        wrappedCmd = `timeout ${timeoutSec} ${cmd}`;
+      } else {
+        // shell, python3: use ulimit -v for virtual memory limit
+        wrappedCmd = `ulimit -v ${memKb} 2>/dev/null; timeout ${timeoutSec} ${cmd}`;
+      }
+
+      try {
+        stdout = execSync(wrappedCmd, {
+          timeout: timeoutMs + 5000,
+          encoding: 'utf8',
+          maxBuffer: 1024 * 512,
+          killSignal: 'SIGKILL',
+        }).trim();
+      } catch (execErr) {
+        stdout = (execErr.stdout || '').trim();
+        stderr = (execErr.stderr || '').trim();
+        exitCode = execErr.status || 1;
+        if (exitCode === 124) {
+          stderr = `Process killed: exceeded ${timeoutSec}s timeout`;
+        }
+      }
+      // Cleanup temp files
+      try {
+        if (runtime === 'python3' || runtime === 'python') {
+          execSync('rm -f /tmp/chimera-compute-*.py', { timeout: 2000, encoding: 'utf8' });
+        } else if (runtime === 'node' || runtime === 'javascript' || runtime === 'js') {
+          execSync('rm -f /tmp/chimera-compute-*.js', { timeout: 2000, encoding: 'utf8' });
+        }
+      } catch {}
     }
 
     // Build structured output
@@ -515,7 +531,7 @@ export class CasperEscrowBridge {
     if (stderr) {
       result.push(`stderr:\n${stderr.slice(0, 500)}`);
     }
-    result.push(`\n[resources: ${cpuCores} CPU, ${ramMb}MB RAM, gpu=${gpu}, timeout=${timeoutSec}s]`);
+    result.push(`\n[resources: ${cpuCores} CPU, ${ramMb}MB RAM, gpu=${gpu}, timeout=${timeoutSec}s, runtime=${runtime}]`);
 
     return result.join('\n');
   }
@@ -526,12 +542,177 @@ export class CasperEscrowBridge {
     const duration = parts[1] || '1h';
     const dataGb = parts[2] || '1GB';
 
-    this.logger.info(`Bandwidth job: ${duration} ${dataGb}`);
+    const durationSec = parseInt(duration, 10) * 3600;
+    const dataBytes = parseInt(dataGb, 10) * 1024 * 1024 * 1024;
 
-    // Generate a session configuration
+    this.logger.info(`Bandwidth job: ${duration} (${durationSec}s), ${dataGb} (${dataBytes} bytes)`);
+
     const sessionId = this.computeHash(`${this.providerAccountHash}:${Date.now()}`).slice(0, 16);
-    const port = 9001 + Math.floor(Math.random() * 100);
-    const response = `Bandwidth session active. Session ID: ${sessionId}, Duration: ${duration}, Data: ${dataGb}, Endpoint: 127.0.0.1:${port}, Protocol: SOCKS5`;
+    const port = 9001 + (Math.floor(Math.random() * 998));
+
+    // Start a real SOCKS5 proxy server
+    let server;
+    let bytesTransferred = 0;
+    let connections = 0;
+    let expired = false;
+    const startTime = Date.now();
+
+    try {
+      const net = await import('net');
+
+      server = net.createServer((socket) => {
+        connections++;
+        this.logger.info(`[SOCKS5:${sessionId}] New connection #${connections} from ${socket.remoteAddress}`);
+
+        let state = 'greeting';
+        let targetHost = null;
+        let targetPort = null;
+        let targetSocket = null;
+
+        socket.on('data', (data) => {
+          if (expired || bytesTransferred >= dataBytes) {
+            socket.end();
+            return;
+          }
+
+          if (state === 'greeting') {
+            // SOCKS5 greeting: version(1) + nmethods(1) + methods(n)
+            if (data[0] !== 0x05) { socket.end(); return; }
+            const nmethods = data[1];
+            // Respond: no authentication required
+            socket.write(Buffer.from([0x05, 0x00]));
+            state = 'request';
+            return;
+          }
+
+          if (state === 'request') {
+            // SOCKS5 request: version(1) + cmd(1) + rsv(1) + atyp(1) + addr + port(2)
+            if (data[0] !== 0x05) { socket.end(); return; }
+            const cmd = data[1];
+            if (cmd !== 0x01) {
+              // Only CONNECT supported
+              socket.write(Buffer.from([0x05, 0x07, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]));
+              socket.end();
+              return;
+            }
+            const atyp = data[3];
+            let addrOffset = 4;
+            let addrLen = 0;
+            if (atyp === 0x01) {
+              // IPv4
+              addrLen = 4;
+              targetHost = Array.from(data.slice(addrOffset, addrOffset + addrLen)).join('.');
+            } else if (atyp === 0x03) {
+              // Domain name
+              addrLen = data[addrOffset];
+              addrOffset++;
+              targetHost = data.slice(addrOffset, addrOffset + addrLen).toString('ascii');
+            } else if (atyp === 0x04) {
+              // IPv6
+              addrLen = 16;
+              const parts = [];
+              for (let i = 0; i < 16; i += 2) {
+                parts.push(data.slice(addrOffset + i, addrOffset + i + 2).toString('hex'));
+              }
+              targetHost = parts.join(':');
+            } else {
+              socket.end();
+              return;
+            }
+            const portOffset = addrOffset + addrLen;
+            targetPort = (data[portOffset] << 8) | data[portOffset + 1];
+
+            this.logger.info(`[SOCKS5:${sessionId}] CONNECT ${targetHost}:${targetPort}`);
+
+            // Connect to target
+            targetSocket = new net.Socket();
+            targetSocket.connect(targetPort, targetHost, () => {
+              // Send success response
+              const reply = Buffer.from([0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+              socket.write(reply);
+              state = 'relay';
+            });
+
+            targetSocket.on('error', (err) => {
+              this.logger.warn(`[SOCKS5:${sessionId}] Target error: ${err.message}`);
+              // Send connection refused
+              const reply = Buffer.from([0x05, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+              socket.write(reply);
+              socket.end();
+            });
+
+            targetSocket.on('data', (tdata) => {
+              bytesTransferred += tdata.length;
+              if (bytesTransferred >= dataBytes) {
+                this.logger.info(`[SOCKS5:${sessionId}] Data cap reached (${bytesTransferred}/${dataBytes} bytes)`);
+                socket.end();
+                targetSocket.end();
+                return;
+              }
+              socket.write(tdata);
+            });
+
+            targetSocket.on('close', () => {
+              socket.end();
+            });
+
+            return;
+          }
+
+          if (state === 'relay') {
+            // Forward client data to target
+            bytesTransferred += data.length;
+            if (bytesTransferred >= dataBytes) {
+              this.logger.info(`[SOCKS5:${sessionId}] Data cap reached (${bytesTransferred}/${dataBytes} bytes)`);
+              socket.end();
+              if (targetSocket) targetSocket.end();
+              return;
+            }
+            if (targetSocket && !targetSocket.destroyed) {
+              targetSocket.write(data);
+            }
+          }
+        });
+
+        socket.on('error', () => {
+          if (targetSocket && !targetSocket.destroyed) targetSocket.end();
+        });
+
+        socket.on('close', () => {
+          if (targetSocket && !targetSocket.destroyed) targetSocket.end();
+        });
+      });
+
+      server.listen(port, '0.0.0.0', () => {
+        this.logger.info(`[SOCKS5:${sessionId}] Proxy server listening on 0.0.0.0:${port}`);
+      });
+
+      // Set expiry timer
+      setTimeout(() => {
+        expired = true;
+        this.logger.info(`[SOCKS5:${sessionId}] Session expired after ${durationSec}s`);
+        try { server.close(); } catch {}
+      }, durationSec * 1000);
+
+      // Store server reference for cleanup
+      if (!this._bandwidthServers) this._bandwidthServers = new Map();
+      this._bandwidthServers.set(sessionId, { server, port, startTime, bytesTransferred: () => bytesTransferred, connections: () => connections });
+
+    } catch (e) {
+      this.logger.error(`[SOCKS5:${sessionId}] Failed to start proxy: ${e.message}`);
+      return `Bandwidth session failed to start: ${e.message}`;
+    }
+
+    const response = [
+      `Bandwidth session active.`,
+      `Session ID: ${sessionId}`,
+      `Endpoint: 0.0.0.0:${port}`,
+      `Protocol: SOCKS5`,
+      `Duration: ${duration} (${durationSec}s)`,
+      `Data cap: ${dataGb} (${dataBytes} bytes)`,
+      `Started: ${new Date().toISOString()}`,
+    ].join('\n');
+
     return response;
   }
 

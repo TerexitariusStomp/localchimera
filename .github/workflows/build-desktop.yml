@@ -400,12 +400,12 @@ jobs:
             cp apps/mobile-expo/android/app/build/outputs/apk/release/app-release.apk mobile-build/Chimera-Android-universal.apk
           fi
           # Also copy debug APK for testing (no ProGuard/R8)
-          if [ -f apps/mobile-expo/android/app/build/outputs/apk/arm64-v8a/debug/app-arm64-v8a-debug.apk ]; then
+          if [ -f apps/mobile-expo/android/app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp apps/mobile-expo/android/app/build/outputs/apk/debug/app-debug.apk mobile-build/app-universal-debug.apk
+          elif [ -f apps/mobile-expo/android/app/build/outputs/apk/arm64-v8a/debug/app-arm64-v8a-debug.apk ]; then
             cp apps/mobile-expo/android/app/build/outputs/apk/arm64-v8a/debug/app-arm64-v8a-debug.apk mobile-build/app-arm64-v8a-debug.apk
           elif [ -f apps/mobile-expo/android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk ]; then
             cp apps/mobile-expo/android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk mobile-build/app-arm64-v8a-debug.apk
-          elif [ -f apps/mobile-expo/android/app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp apps/mobile-expo/android/app/build/outputs/apk/debug/app-debug.apk mobile-build/app-arm64-v8a-debug.apk
           fi
       - name: Upload mobile artifacts
         uses: actions/upload-artifact@v4
