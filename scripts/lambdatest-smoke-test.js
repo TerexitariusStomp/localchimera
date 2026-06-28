@@ -9,16 +9,17 @@ async function runTest() {
   const browser = await remote({
     user: process.env.LT_USERNAME,
     key: process.env.LT_ACCESS_KEY,
-    hostname: 'beta-hub.lambdatest.com',
+    hostname: 'mobile-hub.lambdatest.com',
     protocol: 'https',
     port: 443,
     path: '/wd/hub',
     connectionRetryTimeout: 120000,
     capabilities: {
       'lt:options': {
-        deviceName: 'Pixel 6',
+        deviceName: 'Galaxy A33 5G',
         platformName: 'Android',
-        platformVersion: '12',
+        platformVersion: '13',
+        isRealMobile: false,
         build: `Chimera-${process.env.GITHUB_RUN_ID || 'local'}`,
         name: 'Smoke test - WebView launch',
         w3c: true,
