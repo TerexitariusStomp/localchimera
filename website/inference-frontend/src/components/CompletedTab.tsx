@@ -17,14 +17,6 @@ const JOB_STATUS: Record<string, string> = {
   '4': 'paid', '5': 'refunded', '6': 'disputed', '7': 'resolved',
 };
 
-const AGREEMENT_STATUS: Record<string, string> = {
-  '0': 'pending', '1': 'approved', '2': 'rejected', '3': 'active', '4': 'terminated',
-};
-
-const SESSION_STATUS: Record<string, string> = {
-  '0': 'pending', '1': 'confirmed', '2': 'closed', '3': 'disputed', '4': 'resolved',
-};
-
 export default function CompletedTab() {
   const [loading, setLoading] = useState(false);
   const [tasks, setTasks] = useState<CompletedTask[]>([]);
@@ -34,10 +26,10 @@ export default function CompletedTab() {
     const all: CompletedTask[] = [];
 
     try {
-      // Inference — completed, confirmed, paid, resolved, refunded
-      const imKeys = await getContractNamedKeys(CONTRACTS.inferenceMarket);
-      const jobsUref = imKeys['jobs_dict'];
-      const pendingUref = imKeys['pending_jobs'];
+      // Query escrow vault for all jobs — categorize by request_hash prefix
+      const evKeys = await getContractNamedKeys(CONTRACTS.escrowVault);
+      const jobsUref = evKeys['jobs_dict'];
+      const pendingUref = evKeys['pending_jobs'];
       if (jobsUref && pendingUref) {
         const pendingList = await queryDictionary(pendingUref, 'list');
         const jobIds: string[] = Array.isArray(pendingList) ? pendingList as string[] : [];
@@ -45,59 +37,24 @@ export default function CompletedTab() {
           const state = await queryDictionary(jobsUref, `${id}:state`);
           if (state === null || state === undefined) continue;
           const stateNum = Number(state);
-          // Show jobs that are provider_done (2) or beyond
           if (stateNum < 2) continue;
           const statusStr = JOB_STATUS[String(stateNum)] || String(stateNum);
           const amount = Number(await queryDictionary(jobsUref, `${id}:amount`) || '0');
-          all.push({ id, market: 'Inference', marketIcon: 'brain', amount, status: statusStr, details: `${id.slice(0, 30)}...` });
-        }
-      }
+          const requestHash = String(await queryDictionary(jobsUref, `${id}:request_hash`) || '');
 
-      // Storage — confirmed files
-      const smKeys = await getContractNamedKeys(CONTRACTS.storageMarket);
-      const filesUref = smKeys['sm_files'];
-      if (filesUref) {
-        for (let i = 0; i < 20; i++) {
-          const id = `file-${i}`;
-          const status = await queryDictionary(filesUref, `${id}:status`);
-          if (status === null || status === undefined) continue;
-          if (String(status) !== '1') continue;
-          const sizeMb = String(await queryDictionary(filesUref, `${id}:size`) || '0');
-          const fileHash = String(await queryDictionary(filesUref, `${id}:hash`) || '');
-          all.push({ id, market: 'Storage', marketIcon: 'harddrive', amount: 0, status: 'confirmed', details: `${sizeMb} MB · ${fileHash.slice(0, 16)}...` });
-        }
-      }
+          let market = 'Inference', marketIcon = 'brain', details = requestHash.slice(0, 40) || id;
+          if (requestHash.startsWith('STORAGE:')) {
+            market = 'Storage'; marketIcon = 'harddrive';
+            details = requestHash.slice(0, 40);
+          } else if (requestHash.startsWith('COMPUTE:')) {
+            market = 'Compute'; marketIcon = 'cpu';
+            details = requestHash.slice(0, 40);
+          } else if (requestHash.startsWith('BANDWIDTH:')) {
+            market = 'Bandwidth'; marketIcon = 'wifi';
+            details = requestHash.slice(0, 40);
+          }
 
-      // Compute — terminated agreements
-      const cmKeys = await getContractNamedKeys(CONTRACTS.computeMarket);
-      const agreementsUref = cmKeys['cm_agreements'];
-      if (agreementsUref) {
-        for (let i = 0; i < 20; i++) {
-          const id = `agreement-${i}`;
-          const status = await queryDictionary(agreementsUref, `${id}:status`);
-          if (status === null || status === undefined) continue;
-          const statusStr = AGREEMENT_STATUS[String(status)] || String(status);
-          if (!['terminated'].includes(statusStr)) continue;
-          const amount = Number(await queryDictionary(agreementsUref, `${id}:amount`) || '0');
-          const demandId = String(await queryDictionary(agreementsUref, `${id}:demand`) || '');
-          all.push({ id, market: 'Compute', marketIcon: 'cpu', amount, status: statusStr, details: `Demand: ${demandId}` });
-        }
-      }
-
-      // Bandwidth — closed/resolved sessions
-      const bmKeys = await getContractNamedKeys(CONTRACTS.bandwidthMarket);
-      const sessionsUref = bmKeys['bm_sessions'];
-      if (sessionsUref) {
-        for (let i = 0; i < 20; i++) {
-          const id = `session-${i}`;
-          const status = await queryDictionary(sessionsUref, `${id}:status`);
-          if (status === null || status === undefined) continue;
-          const statusStr = SESSION_STATUS[String(status)] || String(status);
-          if (!['closed', 'resolved'].includes(statusStr)) continue;
-          const amount = Number(await queryDictionary(sessionsUref, `${id}:amount`) || '0');
-          const maxDuration = String(await queryDictionary(sessionsUref, `${id}:max_duration`) || '0');
-          const maxData = String(await queryDictionary(sessionsUref, `${id}:max_data`) || '0');
-          all.push({ id, market: 'Bandwidth', marketIcon: 'wifi', amount, status: statusStr, details: `${maxDuration}s · ${maxData} MB` });
+          all.push({ id, market, marketIcon, amount, status: statusStr, details });
         }
       }
     } catch (e) {

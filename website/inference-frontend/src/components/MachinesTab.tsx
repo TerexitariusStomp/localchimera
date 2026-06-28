@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, Badge } from './ui';
 import { RefreshCw, Brain, HardDrive, Cpu, Wifi, Server } from 'lucide-react';
 import { CONTRACTS, getContractNamedKeys, queryDictionary } from '../casper-client';
-import { PublicKey } from 'casper-js-sdk';
 
 interface Machine {
   market: string;
@@ -23,7 +22,7 @@ export default function MachinesTab() {
     const all: Machine[] = [];
 
     try {
-      // Inference providers — from compute registry
+      // Query compute registry for all registered providers and their resource capacities
       const crKeys = await getContractNamedKeys(CONTRACTS.computeRegistry);
       const providersListUref = crKeys['providers_list'];
       const providersNameUref = crKeys['providers_name'];
@@ -33,6 +32,8 @@ export default function MachinesTab() {
       const providersCpuUref = crKeys['providers_cpu_cores'];
       const providersRamUref = crKeys['providers_ram'];
       const providersModelsUref = crKeys['providers_models'];
+      const providersCapacityUref = crKeys['providers_total_capacity_mb'];
+      const providersBandwidthUref = crKeys['providers_bandwidth_mbps'];
       const providersServiceUref = crKeys['providers_service_type'];
       const stakesUref = crKeys['stakes'];
       if (providersListUref) {
@@ -48,97 +49,32 @@ export default function MachinesTab() {
             const cpu = String(await queryDictionary(providersCpuUref, ph) || '0');
             const ram = String(await queryDictionary(providersRamUref, ph) || '0');
             const models = String(await queryDictionary(providersModelsUref, ph) || '');
+            const capacity = String(await queryDictionary(providersCapacityUref, ph) || '0');
+            const bandwidth = String(await queryDictionary(providersBandwidthUref, ph) || '0');
+            const serviceType = String(await queryDictionary(providersServiceUref, ph) || '');
             const stake = String(await queryDictionary(stakesUref, ph) || '0');
             const stakeCSPR = (Number(stake) / 1e9).toFixed(2);
+            const isActive = String(status) === '1';
+
+            // Build specs string showing all resource capabilities
+            const specsParts: string[] = [];
+            if (models) specsParts.push(`Models: ${models.slice(0, 30)}`);
+            if (cpu !== '0') specsParts.push(`CPU: ${cpu} cores`);
+            if (ram !== '0') specsParts.push(`RAM: ${ram}MB`);
+            if (capacity !== '0') specsParts.push(`Storage: ${capacity}MB`);
+            if (bandwidth !== '0') specsParts.push(`Bandwidth: ${bandwidth}Mbps`);
+            specsParts.push(`GPU: ${Boolean(gpu)}`);
+            if (vram !== '0') specsParts.push(`VRAM: ${vram}MB`);
+            const specs = specsParts.join(' · ');
+
             all.push({
-              market: 'Inference', marketIcon: 'brain',
+              market: 'All Resources', marketIcon: 'server',
               address: ph.slice(0, 20) + '...',
               name,
-              status: String(status) === '1' ? 'active' : 'paused',
-              specs: `CPU: ${cpu} · GPU: ${Boolean(gpu)} · RAM: ${ram}MB${models ? ' · Models: ' + models.slice(0, 30) : ''}`,
+              status: isActive ? 'active' : 'paused',
+              specs,
               stake: stakeCSPR + ' CSPR',
             });
-          } catch {}
-        }
-      }
-
-      // Storage providers
-      const smKeys = await getContractNamedKeys(CONTRACTS.storageMarket);
-      const smProvidersUref = smKeys['sm_providers'];
-      if (smProvidersUref) {
-        const testHashes = [
-          '020227d8dd5ccaa600e45b36e598d90ef8c26b6c67ef81bdfebde8fa583997a91ea5',
-        ];
-        for (const pkHex of testHashes) {
-          try {
-            const { PublicKey } = await import('casper-js-sdk');
-            const pk = PublicKey.fromHex(pkHex);
-            const hashHex = pk.accountHash().toHex();
-            const status = await queryDictionary(smProvidersUref, `${hashHex}:status`);
-            if (status !== null && status !== undefined) {
-              all.push({
-                market: 'Storage', marketIcon: 'harddrive',
-                address: pkHex.slice(0, 12) + '...',
-                name: String(await queryDictionary(smProvidersUref, `${hashHex}:name`) || 'Unknown'),
-                status: String(status) === '1' ? 'active' : 'paused',
-                specs: `Capacity: ${String(await queryDictionary(smProvidersUref, `${hashHex}:capacity`) || '0')}MB`,
-                stake: String(await queryDictionary(smProvidersUref, `${hashHex}:stake`) || '0'),
-              });
-            }
-          } catch {}
-        }
-      }
-
-      // Compute providers
-      const cmKeys = await getContractNamedKeys(CONTRACTS.computeMarket);
-      const cmProvidersUref = cmKeys['cm_providers'];
-      if (cmProvidersUref) {
-        const testHashes = [
-          '020227d8dd5ccaa600e45b36e598d90ef8c26b6c67ef81bdfebde8fa583997a91ea5',
-        ];
-        for (const pkHex of testHashes) {
-          try {
-            const { PublicKey } = await import('casper-js-sdk');
-            const pk = PublicKey.fromHex(pkHex);
-            const hashHex = pk.accountHash().toHex();
-            const status = await queryDictionary(cmProvidersUref, `${hashHex}:status`);
-            if (status !== null && status !== undefined) {
-              all.push({
-                market: 'Compute', marketIcon: 'cpu',
-                address: pkHex.slice(0, 12) + '...',
-                name: String(await queryDictionary(cmProvidersUref, `${hashHex}:name`) || 'Unknown'),
-                status: String(status) === '1' ? 'active' : 'paused',
-                specs: `CPU: ${String(await queryDictionary(cmProvidersUref, `${hashHex}:cpu_cores`) || '0')} cores · GPU: ${Boolean(await queryDictionary(cmProvidersUref, `${hashHex}:gpu`))}`,
-                stake: String(await queryDictionary(cmProvidersUref, `${hashHex}:stake`) || '0'),
-              });
-            }
-          } catch {}
-        }
-      }
-
-      // Bandwidth providers
-      const bmKeys = await getContractNamedKeys(CONTRACTS.bandwidthMarket);
-      const bmProvidersUref = bmKeys['bm_providers'];
-      if (bmProvidersUref) {
-        const testHashes = [
-          '020227d8dd5ccaa600e45b36e598d90ef8c26b6c67ef81bdfebde8fa583997a91ea5',
-        ];
-        for (const pkHex of testHashes) {
-          try {
-            const { PublicKey } = await import('casper-js-sdk');
-            const pk = PublicKey.fromHex(pkHex);
-            const hashHex = pk.accountHash().toHex();
-            const status = await queryDictionary(bmProvidersUref, `${hashHex}:status`);
-            if (status !== null && status !== undefined) {
-              all.push({
-                market: 'Bandwidth', marketIcon: 'wifi',
-                address: pkHex.slice(0, 12) + '...',
-                name: String(await queryDictionary(bmProvidersUref, `${hashHex}:name`) || 'Unknown'),
-                status: String(status) === '1' ? 'active' : 'paused',
-                specs: `Price/hr: ${String(await queryDictionary(bmProvidersUref, `${hashHex}:price_hr`) || '0')} · Price/GB: ${String(await queryDictionary(bmProvidersUref, `${hashHex}:price_gb`) || '0')}`,
-                stake: String(await queryDictionary(bmProvidersUref, `${hashHex}:stake`) || '0'),
-              });
-            }
           } catch {}
         }
       }
@@ -163,6 +99,7 @@ export default function MachinesTab() {
     if (icon === 'harddrive') return <HardDrive className={cls} />;
     if (icon === 'cpu') return <Cpu className={cls} />;
     if (icon === 'wifi') return <Wifi className={cls} />;
+    if (icon === 'server') return <Server className={cls} />;
     return null;
   };
 
