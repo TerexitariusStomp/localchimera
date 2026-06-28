@@ -384,18 +384,28 @@ export class CasperEscrowBridge {
   }
 
   async _handleStorageJob(orderId) {
-    // Parse: STORAGE:fileDesc:sizeMb
+    // Parse: STORAGE:ALLOC:spaceName:sizeMb  or  STORAGE:FILE:spaceName:fileHash:sizeMb
     const parts = orderId.split(':');
-    const fileDesc = parts[1] || 'unknown';
-    const sizeMb = parts[2] || '0';
+    const subType = parts[1] || 'ALLOC';
+    const spaceName = parts[2] || 'unknown';
 
-    this.logger.info(`Storage job: ${fileDesc} (${sizeMb})`);
+    if (subType === 'FILE') {
+      const fileHash = parts[3] || '';
+      const sizeMb = parts[4] || '0';
+      this.logger.info(`Storage FILE job: space=${spaceName}, hash=${fileHash.slice(0, 16)}, size=${sizeMb}`);
 
-    // Generate a storage proof — hash of the file description + timestamp + provider
-    const proof = this.computeHash(`${fileDesc}:${sizeMb}:${this.providerAccountHash}:${Date.now()}`);
-    const storagePath = `/tmp/chimera-storage/${proof.slice(0, 16)}`;
-    const response = `Storage confirmed. File: ${fileDesc}, Size: ${sizeMb}, Proof: ${proof.slice(0, 32)}..., Path: ${storagePath}`;
-    return response;
+      const proof = this.computeHash(`${spaceName}:${fileHash}:${this.providerAccountHash}:${Date.now()}`);
+      const storagePath = `/tmp/chimera-storage/${spaceName}/${fileHash.slice(0, 16)}`;
+      return `File stored. Space: ${spaceName}, Hash: ${fileHash.slice(0, 32)}..., Size: ${sizeMb}, Proof: ${proof.slice(0, 32)}..., Path: ${storagePath}`;
+    }
+
+    // ALLOC
+    const sizeMb = parts[3] || '0';
+    this.logger.info(`Storage ALLOC job: space=${spaceName}, size=${sizeMb}`);
+
+    const proof = this.computeHash(`${spaceName}:${sizeMb}:${this.providerAccountHash}:${Date.now()}`);
+    const storagePath = `/tmp/chimera-storage/${spaceName}`;
+    return `Storage space allocated. Name: ${spaceName}, Size: ${sizeMb}, Proof: ${proof.slice(0, 32)}..., Path: ${storagePath}`;
   }
 
   async _handleComputeJob(orderId) {

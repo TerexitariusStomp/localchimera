@@ -281,18 +281,18 @@ export default function TaskerTab({ provider, publicKeyHex, accountHash, onTx }:
         )}
 
         {resource === 'storage' && (
-        <EntryPointCard title="Storage" contract="EscrowVault" contractHash={CONTRACTS.escrowVault} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+        <EntryPointCard title="Reserve Storage Space" contract="EscrowVault" contractHash={CONTRACTS.escrowVault} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
           {() => {
             const [amount, setAmount] = useState('10');
-            const [fileDesc, setFileDesc] = useState('');
+            const [spaceName, setSpaceName] = useState('');
             const [sizeMb, setSizeMb] = useState('100');
             const amountMotes = Math.floor(parseFloat(amount || '0') * 1e9).toString();
             const handleSubmit = async (e: any) => {
               e.preventDefault();
-              if (!canSign || !fileDesc.trim()) return;
+              if (!canSign || !spaceName.trim()) return;
               const consumerHash = sdk.PublicKey.fromHex(publicKeyHex).accountHash();
               const zeroHash = new Uint8Array(32);
-              const orderId = `STORAGE:${fileDesc.trim()}:${sizeMb}MB`;
+              const orderId = `STORAGE:ALLOC:${spaceName.trim()}:${sizeMb}MB`;
               const result = await callEntryPointWithWallet(provider, publicKeyHex, CONTRACTS.escrowVault, 'create_job', {
                 consumer: sdk.CLValue.newCLByteArray(consumerHash.toBytes()),
                 provider: sdk.CLValue.newCLByteArray(zeroHash),
@@ -304,23 +304,137 @@ export default function TaskerTab({ provider, publicKeyHex, accountHash, onTx }:
                 onTx({ id: Date.now().toString(), deployHash: result.deployHash, entryPoint: 'create_job', contract: 'EscrowVault', status: result.error ? 'error' : 'pending', error: result.error });
               }
             };
-            const completedJobs = jobs.filter(j => j.state >= 3 && j.responseHash && j.requestHash?.startsWith('STORAGE:'));
+            const completedAllocs = jobs.filter(j => j.state >= 3 && j.responseHash && j.requestHash?.startsWith('STORAGE:ALLOC:'));
             return <div className="space-y-3">
               <form onSubmit={handleSubmit} className="space-y-2">
-                <div className="text-xs text-muted-foreground flex items-center gap-1"><HardDrive className="h-3 w-3 text-[#00e5ff]" />Request decentralized storage. Provider stores your data and returns a storage proof.</div>
-                <Input label="File Description / Hash" value={fileDesc} onChange={setFileDesc} placeholder="e.g. my-backup.tar.gz or sha256 hash" />
+                <div className="text-xs text-muted-foreground flex items-center gap-1"><HardDrive className="h-3 w-3 text-[#00e5ff]" />Reserve a named storage space on a provider's machine. You'll get an allocation proof to store files into.</div>
+                <Input label="Storage Space Name" value={spaceName} onChange={setSpaceName} placeholder="e.g. my-backups, dataset-v2, media-archive" />
                 <Input label="Size (MB)" value={sizeMb} onChange={setSizeMb} />
                 <Input label="Funds (CSPR)" value={amount} onChange={setAmount} />
-                <Button type="submit" disabled={!canSign || !fileDesc.trim()} className="w-full"><HardDrive className="h-4 w-4 mr-1" />Request Storage</Button>
+                <Button type="submit" disabled={!canSign || !spaceName.trim()} className="w-full"><HardDrive className="h-4 w-4 mr-1" />Reserve Storage Space</Button>
               </form>
-              {completedJobs.length > 0 && (
+              {completedAllocs.length > 0 && (
                 <div className="space-y-2 mt-3 border-t border-white/10 pt-3">
-                  <div className="text-xs font-semibold text-[#00e5ff] flex items-center gap-1"><CheckCircle className="h-3 w-3" />Storage Results</div>
-                  {completedJobs.slice(-5).reverse().map((job) => (
+                  <div className="text-xs font-semibold text-[#00e5ff] flex items-center gap-1"><CheckCircle className="h-3 w-3" />Allocated Storage Spaces</div>
+                  {completedAllocs.slice(-5).reverse().map((job) => (
                     <div key={job.id} className="bg-white/[0.03] border border-white/10 rounded-lg p-3 space-y-2">
                       {job.requestHash && (
                         <div className="space-y-1">
-                          <div className="text-[10px] text-[#7a7468] font-semibold">Request</div>
+                          <div className="text-[10px] text-[#7a7468] font-semibold">Space</div>
+                          <div className="text-xs text-[#e8e2d8] whitespace-pre-wrap break-words">{job.requestHash}</div>
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <div className="text-[10px] text-[#00e5ff] font-semibold">Allocation Proof</div>
+                        <div className="text-xs text-[#e8e2d8] whitespace-pre-wrap break-words">{job.responseHash}</div>
+                      </div>
+                      <div className="text-[10px] text-[#7a7468]">Status: {job.status}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {jobs.length > 0 && jobs.filter(j => j.state < 3 && j.requestHash?.startsWith('STORAGE:ALLOC:')).length > 0 && (
+                <div className="space-y-1 mt-3 border-t border-white/10 pt-3">
+                  <div className="text-xs font-semibold text-[#7a7468]">Pending Reservations</div>
+                  {jobs.filter(j => j.state < 3 && j.requestHash?.startsWith('STORAGE:ALLOC:')).map((job) => (
+                    <div key={job.id} className="flex items-center justify-between text-xs bg-white/[0.02] rounded p-2 overflow-hidden">
+                      <span className="font-mono text-[10px] text-[#7a7468] truncate flex-1 mr-2">{job.requestHash || job.id}</span>
+                      <span className="text-[#00e5ff] shrink-0">{job.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>;
+          }}
+        </EntryPointCard>
+        )}
+
+        {resource === 'storage' && (
+        <EntryPointCard title="Store File" contract="EscrowVault" contractHash={CONTRACTS.escrowVault} provider={provider} publicKeyHex={publicKeyHex} onTx={onTx}>
+          {() => {
+            const [amount, setAmount] = useState('5');
+            const [spaceName, setSpaceName] = useState('');
+            const [selectedFile, setSelectedFile] = useState<File | null>(null);
+            const [uploading, setUploading] = useState(false);
+            const amountMotes = Math.floor(parseFloat(amount || '0') * 1e9).toString();
+            const completedSpaces = jobs.filter(j => j.state >= 3 && j.responseHash && j.requestHash?.startsWith('STORAGE:ALLOC:'));
+            const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+              const f = e.target.files?.[0] || null;
+              setSelectedFile(f);
+            };
+            const handleSubmit = async (e: any) => {
+              e.preventDefault();
+              if (!canSign || !spaceName.trim() || !selectedFile) return;
+              setUploading(true);
+              try {
+                const fileBuffer = await selectedFile.arrayBuffer();
+                const hashBuffer = await crypto.subtle.digest('SHA-256', fileBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                const fileSizeMb = String(Math.ceil(selectedFile.size / (1024 * 1024)));
+                const consumerHash = sdk.PublicKey.fromHex(publicKeyHex).accountHash();
+                const zeroHash = new Uint8Array(32);
+                const orderId = `STORAGE:FILE:${spaceName.trim()}:${fileHash}:${fileSizeMb}MB`;
+                const result = await callEntryPointWithWallet(provider, publicKeyHex, CONTRACTS.escrowVault, 'create_job', {
+                  consumer: sdk.CLValue.newCLByteArray(consumerHash.toBytes()),
+                  provider: sdk.CLValue.newCLByteArray(zeroHash),
+                  amount: sdk.CLValue.newCLUInt512(amountMotes),
+                  provider_fee_bps: sdk.CLValue.newCLUint64('0'),
+                  order_id: sdk.CLValue.newCLString(orderId),
+                });
+                if (result.deployHash) {
+                  onTx({ id: Date.now().toString(), deployHash: result.deployHash, entryPoint: 'create_job', contract: 'EscrowVault', status: result.error ? 'error' : 'pending', error: result.error });
+                }
+              } finally {
+                setUploading(false);
+              }
+            };
+            const completedFiles = jobs.filter(j => j.state >= 3 && j.responseHash && j.requestHash?.startsWith('STORAGE:FILE:'));
+            return <div className="space-y-3">
+              <form onSubmit={handleSubmit} className="space-y-2">
+                <div className="text-xs text-muted-foreground">Upload a file into a reserved storage space. File hash is computed automatically.</div>
+                {completedSpaces.length > 0 && (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Select Storage Space</label>
+                    <div className="flex flex-wrap gap-1">
+                      {completedSpaces.map((s) => {
+                        const name = s.requestHash?.split(':')[2] || s.id;
+                        return (
+                          <button key={s.id} type="button" onClick={() => setSpaceName(name)}
+                            className={`text-[10px] px-2 py-1 rounded font-mono ${spaceName === name ? 'bg-[#00e5ff]/20 text-[#00e5ff]' : 'bg-white/5 text-[#7a7468] hover:bg-white/10'}`}>
+                            {name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <Input label="Storage Space Name" value={spaceName} onChange={setSpaceName} placeholder="e.g. my-backups" />
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Upload File</label>
+                  <div className="border border-white/10 rounded-lg p-4 text-center hover:border-[#00e5ff]/30 transition-colors">
+                    <input type="file" onChange={handleFileChange} className="hidden" id="storage-file-upload" />
+                    <label htmlFor="storage-file-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                      <HardDrive className="h-6 w-6 text-[#7a7468]" />
+                      {selectedFile ? (
+                        <span className="text-xs text-[#00e5ff]">{selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)</span>
+                      ) : (
+                        <span className="text-xs text-[#7a7468]">Click to select a file</span>
+                      )}
+                    </label>
+                  </div>
+                </div>
+                <Input label="Funds (CSPR)" value={amount} onChange={setAmount} />
+                <Button type="submit" disabled={!canSign || !spaceName.trim() || !selectedFile || uploading} className="w-full"><Send className="h-4 w-4 mr-1" />{uploading ? 'Processing...' : 'Store File'}</Button>
+              </form>
+              {completedFiles.length > 0 && (
+                <div className="space-y-2 mt-3 border-t border-white/10 pt-3">
+                  <div className="text-xs font-semibold text-[#00e5ff] flex items-center gap-1"><CheckCircle className="h-3 w-3" />Stored Files</div>
+                  {completedFiles.slice(-5).reverse().map((job) => (
+                    <div key={job.id} className="bg-white/[0.03] border border-white/10 rounded-lg p-3 space-y-2">
+                      {job.requestHash && (
+                        <div className="space-y-1">
+                          <div className="text-[10px] text-[#7a7468] font-semibold">File</div>
                           <div className="text-xs text-[#e8e2d8] whitespace-pre-wrap break-words">{job.requestHash}</div>
                         </div>
                       )}
@@ -333,12 +447,12 @@ export default function TaskerTab({ provider, publicKeyHex, accountHash, onTx }:
                   ))}
                 </div>
               )}
-              {jobs.length > 0 && jobs.filter(j => j.state < 3 && j.requestHash?.startsWith('STORAGE:')).length > 0 && (
+              {jobs.length > 0 && jobs.filter(j => j.state < 3 && j.requestHash?.startsWith('STORAGE:FILE:')).length > 0 && (
                 <div className="space-y-1 mt-3 border-t border-white/10 pt-3">
-                  <div className="text-xs font-semibold text-[#7a7468]">Pending Storage Jobs</div>
-                  {jobs.filter(j => j.state < 3 && j.requestHash?.startsWith('STORAGE:')).map((job) => (
+                  <div className="text-xs font-semibold text-[#7a7468]">Pending File Uploads</div>
+                  {jobs.filter(j => j.state < 3 && j.requestHash?.startsWith('STORAGE:FILE:')).map((job) => (
                     <div key={job.id} className="flex items-center justify-between text-xs bg-white/[0.02] rounded p-2 overflow-hidden">
-                      <span className="font-mono text-[10px] text-[#7a7468] truncate flex-1 mr-2">{job.id}</span>
+                      <span className="font-mono text-[10px] text-[#7a7468] truncate flex-1 mr-2">{job.requestHash || job.id}</span>
                       <span className="text-[#00e5ff] shrink-0">{job.status}</span>
                     </div>
                   ))}
