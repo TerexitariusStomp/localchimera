@@ -430,7 +430,26 @@ pub extern "C" fn create_job() {
 
     let now: u64 = Into::<u64>::into(runtime::get_blocktime());
     let valid_until = now + 3_600_000;
-    let task_type: u64 = 0;
+
+    // Determine task_type from order_id prefix for resource-specific routing
+    // task_type: 0=inference, 1=storage, 2=compute, 3=bandwidth
+    let task_type: u64 = if order_id.starts_with("STORAGE:") {
+        1
+    } else if order_id.starts_with("COMPUTE:") {
+        2
+    } else if order_id.starts_with("BANDWIDTH:") {
+        3
+    } else {
+        0
+    };
+
+    // Determine resource_type string for compute registry query
+    let resource_type = match task_type {
+        1 => "storage",
+        2 => "compute",
+        3 => "bandwidth",
+        _ => "inference",
+    };
 
     // Auto-increment per-consumer nonce
     let jobs_dict = get_dict(JOBS_DICT);
@@ -462,21 +481,30 @@ pub extern "C" fn create_job() {
     write_dict(jobs_dict, &format!("{}:provider_fee_bps", job_id), provider_fee_bps);
     write_dict(jobs_dict, &format!("{}:created_at", job_id), now);
 
-    // Auto-assign: if provider is all zeros, query compute registry for a registered provider
+    // Auto-assign: if provider is all zeros, query compute registry for a provider with matching resource
     let is_auto_assign = provider == AccountHash::default();
     let mut assigned_provider = provider;
     if is_auto_assign {
-        // Call compute registry to get list of registered providers
+        // Call compute registry to get providers filtered by resource type
         let cr_key = runtime::get_key(COMPUTE_REGISTRY)
             .unwrap_or_revert_with(ApiError::MissingKey);
         let cr_hash = cr_key.into_hash_addr().unwrap_or_revert_with(ApiError::User(20));
         let cr_contract_hash = ContractHash::new(cr_hash);
-        let providers_str: String = runtime::call_contract(cr_contract_hash, "get_providers", RuntimeArgs::new());
-        if !providers_str.is_empty() {
-            // Pick the first provider from the list
-            let first = providers_str.split(',').next().unwrap_or("");
+
+        // Build args with resource_type for filtered provider lookup
+        let mut args = RuntimeArgs::new();
+        args.insert("resource_type", resource_type).unwrap_or_revert();
+        let providers_str: String = runtime::call_contract(cr_contract_hash, "get_providers_by_resource", args);
+
+        // Fallback to all providers if no resource-specific providers found
+        if providers_str.is_empty() {
+            let all_str: String = runtime::call_contract(cr_contract_hash, "get_providers", RuntimeArgs::new());
+            if all_str.is_empty() {
+                runtime::revert(ApiError::User(21));
+            }
+            // Use all providers as fallback
+            let first = all_str.split(',').next().unwrap_or("");
             if !first.is_empty() {
-                // Parse account hash from string format "account-hash-xxxx"
                 let hex = first.strip_prefix("account-hash-").unwrap_or(first);
                 let mut bytes = [0u8; 32];
                 let hex_bytes = hex.as_bytes();
@@ -486,7 +514,21 @@ pub extern "C" fn create_job() {
                     bytes[i] = (hi << 4) | lo;
                 }
                 assigned_provider = AccountHash::new(bytes);
-                // Update the provider field with the assigned provider
+                write_dict(jobs_dict, &format!("{}:provider", job_id), assigned_provider);
+            }
+        } else {
+            // Pick the first provider from the filtered list
+            let first = providers_str.split(',').next().unwrap_or("");
+            if !first.is_empty() {
+                let hex = first.strip_prefix("account-hash-").unwrap_or(first);
+                let mut bytes = [0u8; 32];
+                let hex_bytes = hex.as_bytes();
+                for i in 0..32 {
+                    let hi = (hex_bytes[i * 2] as char).to_digit(16).unwrap_or(0) as u8;
+                    let lo = (hex_bytes[i * 2 + 1] as char).to_digit(16).unwrap_or(0) as u8;
+                    bytes[i] = (hi << 4) | lo;
+                }
+                assigned_provider = AccountHash::new(bytes);
                 write_dict(jobs_dict, &format!("{}:provider", job_id), assigned_provider);
             }
         }

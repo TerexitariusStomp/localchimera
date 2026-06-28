@@ -330,6 +330,15 @@ fn create_entry_points() -> EntryPoints {
         EntryPointPayment::Caller,
     ));
 
+    eps.add_entry_point(EntityEntryPoint::new(
+        "get_providers_by_resource",
+        vec![Parameter::new("resource_type", String::cl_type())],
+        CLType::String,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
     eps
 }
 
@@ -684,6 +693,46 @@ pub extern "C" fn get_provider() {
         "address={}&status={}&peer_id={}&name={}&task_types={}&stake={}&registered_at={}",
         provider_str, status_str, peer_id, name, task_types, stake.to_string(), registered_at,
     );
+    runtime::ret(CLValue::from_t(result).unwrap_or_revert());
+}
+
+#[no_mangle]
+pub extern "C" fn get_providers_by_resource() {
+    let resource_type: String = runtime::get_named_arg("resource_type");
+    let providers: Vec<AccountHash> = read_dict(get_dict(PROVIDERS_LIST), "list")
+        .unwrap_or_default();
+    let status_dict = get_dict(PROVIDERS_STATUS);
+
+    let mut filtered: Vec<String> = Vec::new();
+    for p in &providers {
+        let p_str = p.to_string();
+        let status: u8 = read_dict(status_dict, &p_str).unwrap_or(STATUS_UNREGISTERED);
+        if status != STATUS_ACTIVE {
+            continue;
+        }
+
+        let has_resource = if resource_type == "inference" {
+            let models: String = read_dict(get_dict(PROVIDERS_MODELS), &p_str).unwrap_or_default();
+            !models.is_empty()
+        } else if resource_type == "storage" {
+            let cap: u64 = read_dict(get_dict(PROVIDERS_CAPACITY), &p_str).unwrap_or(0);
+            cap > 0
+        } else if resource_type == "compute" {
+            let cpu: u64 = read_dict(get_dict(PROVIDERS_CPU_CORES), &p_str).unwrap_or(0);
+            cpu > 0
+        } else if resource_type == "bandwidth" {
+            let bw: u64 = read_dict(get_dict(PROVIDERS_BANDWIDTH), &p_str).unwrap_or(0);
+            bw > 0
+        } else {
+            true
+        };
+
+        if has_resource {
+            filtered.push(p_str);
+        }
+    }
+
+    let result = filtered.join(",");
     runtime::ret(CLValue::from_t(result).unwrap_or_revert());
 }
 

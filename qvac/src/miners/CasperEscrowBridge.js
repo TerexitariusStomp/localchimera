@@ -231,6 +231,7 @@ export class CasperEscrowBridge {
       const providerVal = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'jobs_dict', `${jobId}:provider`);
       const consumerVal = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'jobs_dict', `${jobId}:consumer`);
       const amountVal = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'jobs_dict', `${jobId}:amount`);
+      const taskTypeVal = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'jobs_dict', `${jobId}:task_type`);
 
       if (stateVal === null || providerVal === null) {
         this.logger.warn(`Could not fetch job details for ${jobId}`);
@@ -284,7 +285,7 @@ export class CasperEscrowBridge {
         this.logger.info(`Job ${jobId} request: ${requestHash}`);
 
         // Process job based on type prefix
-        const responseText = await this.processJob(requestHash || jobId);
+        const responseText = await this.processJob(requestHash || jobId, taskTypeVal);
         this.logger.info(`Job ${jobId} response: ${responseText.slice(0, 100)}...`);
 
         // Complete job with actual result
@@ -311,7 +312,7 @@ export class CasperEscrowBridge {
         const requestHash = await getDictionaryItem(this.rpcUrl, this.contracts.escrowVault, 'jobs_dict', `${jobId}:request_hash`);
         this.logger.info(`Job ${jobId} request: ${requestHash}`);
 
-        const responseText = await this.processJob(requestHash || jobId);
+        const responseText = await this.processJob(requestHash || jobId, taskTypeVal);
         this.logger.info(`Job ${jobId} response: ${responseText.slice(0, 100)}...`);
 
         await this.providerComplete(jobId, responseText);
@@ -362,21 +363,22 @@ export class CasperEscrowBridge {
     }
   }
 
-  async processJob(orderId) {
+  async processJob(orderId, taskType) {
     const id = String(orderId);
+    const tt = Number(taskType) || 0;
 
-    // Route based on prefix
-    if (id.startsWith('STORAGE:')) {
+    // Route based on order_id prefix first, then fall back to task_type
+    if (id.startsWith('STORAGE:') || tt === 1) {
       return this._handleStorageJob(id);
     }
-    if (id.startsWith('COMPUTE:')) {
+    if (id.startsWith('COMPUTE:') || tt === 2) {
       return this._handleComputeJob(id);
     }
-    if (id.startsWith('BANDWIDTH:')) {
+    if (id.startsWith('BANDWIDTH:') || tt === 3) {
       return this._handleBandwidthJob(id);
     }
 
-    // Default: inference
+    // Default: inference (task_type 0 or no prefix)
     const result = await this.runInference(id);
     return result.output || result.text || JSON.stringify(result);
   }
