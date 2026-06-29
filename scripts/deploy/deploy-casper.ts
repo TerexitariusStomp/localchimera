@@ -2,7 +2,7 @@
  * Deploy Chimera marketplace contracts to Casper testnet.
  *
  * Usage:
- *   CSPR_PEM_PATH=/path/to/key.pem npx tsx scripts/deploy-casper.ts
+ *   CSPR_PEM_PATH=/path/to/key.pem npx tsx scripts/deploy/deploy-casper.ts
  */
 
 import { readFileSync, writeFileSync } from 'fs';

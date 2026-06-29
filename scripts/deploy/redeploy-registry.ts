@@ -1,6 +1,6 @@
 /**
  * Redeploy ComputeRegistry with 1 CSPR minimum stake.
- * Usage: npx tsx scripts/redeploy-registry.ts
+ * Usage: npx tsx scripts/deploy/redeploy-registry.ts
  */
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';

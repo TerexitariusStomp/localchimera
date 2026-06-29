@@ -116,7 +116,7 @@ npx cap open android  # Android Studio → Generate Signed Bundle
 - **Standalone** — Each device is its own node. No InferenceRouter, no relay.
 - **Hardened** — Docker container runs as non-root with minimal deps.
 - **P2P** — Pear P2P swarm sync for wiki pages across devices.
-- **Mining** — Chutes, Routstr, Earnidle, BTT AI, Golem, Anyone Protocol, Mysterium, Casper miners.
+- **Mining** — Chutes, Routstr, Earnidle, BTT AI, Golem, Anyone Protocol, Mysterium, BTFS (walletless storage), Casper miners.
 - **Fleet** — Commander/worker orchestration for distributed tasks.
 
 ### New: Enhanced Inference & Security Modules
@@ -171,21 +171,20 @@ npx cap open android  # Android Studio → Generate Signed Bundle
 ## Project Structure
 
 ```
-qvac-chimera/
+localchimera/
 ├── website/                  # Marketing site + demo wiki + earnings
-│   ├── index.html            # Landing page
-│   ├── demo-wiki.html        # Read-only LLM Wiki demo
-│   └── earnings.html         # Earnings dashboard
-├── apps/
-│   └── desktop/              # Tauri desktop app (Linux, macOS, Windows)
-│       ├── src/              # React frontend
-│       ├── src-tauri/        # Rust shell + Go sidecar
-│       └── dist/             # Copied from qvac/frontend/dist
+├── website-new/              # Next-generation marketing site
+├── apps/                     # Desktop/mobile apps
+│   ├── desktop/              # Tauri desktop app (Linux, macOS, Windows)
+│   ├── macos/                # Native macOS app
+│   ├── mobile/               # Capacitor mobile app
+│   └── mobile-expo/          # Expo mobile variant
 ├── qvac/                     # Backend node + LLM Wiki frontend
 │   ├── src/                  # Node.js backend
 │   │   ├── core/             # NodeManager, WalletManager, AuditLogger, ContentAddress, DeploymentLifecycle
-│   │   ├── inference/        # QVACInferenceLayer, ProofOfInference, InferenceQueue, PromptGuard, PromptBudgeter, TokenMeter, VoicePipeline, AgentLoop, DocumentChunker
-│   │   ├── miners/           # Chutes, Routstr, Casper, Earnidle (untrusted-hardware-safe)
+│   │   ├── inference/        # QVACInferenceLayer, ProofOfInference, InferenceQueue, PromptGuard, etc.
+│   │   ├── llmwiki/          # Upstream bridges (OtterWiki, OpenViking, LLMwiki)
+│   │   ├── miners/           # Chutes, Routstr, Casper, Earnidle, BTT AI, Golem, Anyone, Mysterium, BTFS
 │   │   ├── p2p/              # Pear P2P networking + CapabilityManifest
 │   │   ├── web/              # HTTP server + API routes
 │   │   └── scheduler/        # TaskMonitor
@@ -193,8 +192,21 @@ qvac-chimera/
 │   ├── Dockerfile            # Hardened container
 │   └── docker-compose.yml    # One-command deploy
 ├── sdk/                      # @chimera/sdk — build your own app
-│   ├── src/
-│   └── examples/
+│   ├── src/                  # Provider implementations
+│   └── examples/             # Integration examples
+├── inference-backend/        # Encrypted inference backend (FHE/SEAL experiments)
+├── inference-config/         # Network deployment configs
+├── contracts/                # EVM smart contracts
+├── contracts-casper/         # Casper Network smart contracts
+├── providers/                # Provider setup/lifecycle scripts
+├── scripts/                  # Automation, deployment, and utility scripts
+├── docs/                     # Documentation (UPSTREAM.md, RELAY_COMPATIBILITY.md, etc.)
+├── cashu/                    # Cashu ecash integration
+├── routstr/                  # Nostr/Cashu inference routing
+├── brand-assets/             # Logos and brand assets
+├── releases/                 # Release notes and artifacts
+├── upstream/                 # Git submodules for upstream forks and dependencies
+├── lib/                      # Foundry libraries (fhevm, forge-std, etc.)
 └── README.md
 ```
 
