@@ -28,11 +28,11 @@ One-click install scripts for setting up Chimera on each platform.
 - **install-macos.sh** — macOS setup with Homebrew dependencies
 - **install.sh** — Universal installer that detects OS
 
-## macos/ (planned)
+## macos/
 
 Native macOS app bundle (.app) and DMG installer. Built from the same Tauri source as desktop/.
 
-## mobile/ (planned)
+## mobile/
 
 Capacitor-wrapped mobile apps for iOS and Android. Each phone is a standalone node — no relay, no desktop dependency.
 
@@ -47,3 +47,7 @@ npx cap sync
 npx cap open ios     # Xcode → Archive → App Store
 npx cap open android # Android Studio → Generate Signed Bundle
 ```
+
+## mobile-expo/
+
+Expo-based mobile app using a Bare worker for on-device inference. See `mobile-expo/README.md` for build instructions.
