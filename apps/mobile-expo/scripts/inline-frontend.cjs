@@ -11,7 +11,12 @@ if (!fs.existsSync(src)) {
 }
 
 const html = fs.readFileSync(src, 'utf-8');
-const escaped = JSON.stringify(html);
+// Fix inline scripts for Android WebView: remove crossorigin and change type="module" to text/javascript
+const patched = html
+  .replace(/<script type="module" crossorigin>/g, '<script type="text/javascript">')
+  .replace(/<script type="module" crossorigin="/g, '<script type="text/javascript" crossorigin="')
+  .replace(/<script type="module">/g, '<script type="text/javascript">');
+const escaped = JSON.stringify(patched);
 const htmlModule = `// Auto-generated from qvac/frontend/dist/index.html. Do not edit manually.
 export default ${escaped};
 `;
