@@ -1,13 +1,8 @@
 import React from 'react'
-import { SafePrivyProvider } from './privy-context.jsx'
 import WikiPage from './pages/WikiPage'
 
 function App() {
-  return (
-    <SafePrivyProvider>
-      <WikiPage />
-    </SafePrivyProvider>
-  )
+  return <WikiPage />
 }
 
 export default App
