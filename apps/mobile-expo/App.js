@@ -293,7 +293,7 @@ export default function App() {
         ref={webViewRef}
         source={{ html: frontendHtml, baseUrl: 'file:///android_asset/frontend/' }}
         style={styles.webview}
-        injectedJavaScriptBeforeContentLoaded={frontendJs}
+        injectedJavaScriptBeforeContentLoaded={`if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){${frontendJs}});}else{${frontendJs}}`}
         injectedJavaScript={injectedBridge}
         onMessage={handleWebViewMessage}
         onLoad={() => { console.log('[App] WebView onLoad fired'); setWebLoading(false); }}
