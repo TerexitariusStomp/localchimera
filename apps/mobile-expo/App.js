@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system';
-import frontendHtml from './frontend-html';
+import frontendHtml, { frontendJs } from './frontend-html';
 
 const LLAMA_MODEL = 'LLAMA_3_2_1B_INST_Q4_0';
 const WIKI_DIR = FileSystem.documentDirectory + 'llmwiki/';
@@ -293,6 +293,7 @@ export default function App() {
         ref={webViewRef}
         source={{ html: frontendHtml }}
         style={styles.webview}
+        injectedJavaScriptBeforeContentLoaded={frontendJs}
         injectedJavaScript={injectedBridge}
         onMessage={handleWebViewMessage}
         onLoad={() => { console.log('[App] WebView onLoad fired'); setWebLoading(false); }}

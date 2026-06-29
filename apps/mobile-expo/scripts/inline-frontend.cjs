@@ -11,17 +11,30 @@ if (!fs.existsSync(src)) {
 }
 
 const html = fs.readFileSync(src, 'utf-8');
-// Fix inline scripts for Android WebView: remove crossorigin and change type="module" to text/javascript
-// Also strip external resource references (manifest, service worker) that break in WebView context
-const patched = html
-  .replace(/<script type="module" crossorigin>/g, '<script type="text/javascript">')
-  .replace(/<script type="module" crossorigin="/g, '<script type="text/javascript" crossorigin="')
-  .replace(/<script type="module">/g, '<script type="text/javascript">')
+
+// Extract the main JS bundle from the inline script tag
+let jsBundle = '';
+let htmlWithoutJs = html;
+
+// Match the main module script (Vite inlines as <script type="module" crossorigin>...</script>)
+const mainScriptMatch = html.match(/<script type="module" crossorigin>([\s\S]*?)<\/script>/);
+if (mainScriptMatch) {
+  jsBundle = mainScriptMatch[1];
+  htmlWithoutJs = html.replace(mainScriptMatch[0], '');
+}
+
+// Strip manifest link and service worker script from HTML
+htmlWithoutJs = htmlWithoutJs
   .replace(/<link rel="manifest"[^>]*>/g, '')
   .replace(/<script>\s*if\s*\('serviceWorker'\s*in\s*navigator\)[\s\S]*?<\/script>/g, '');
-const escaped = JSON.stringify(patched);
+
+const escapedHtml = JSON.stringify(htmlWithoutJs);
+const escapedJs = JSON.stringify(jsBundle);
+
 const htmlModule = `// Auto-generated from qvac/frontend/dist/index.html. Do not edit manually.
-export default ${escaped};
+export const frontendHtml = ${escapedHtml};
+export const frontendJs = ${escapedJs};
+export default frontendHtml;
 `;
 fs.writeFileSync(dest, htmlModule);
-console.log('Frontend HTML inlined into:', dest, `(${html.length} chars)`);
+console.log('Frontend HTML+JS inlined into:', dest, `(html: ${htmlWithoutJs.length} chars, js: ${jsBundle.length} chars)`);
