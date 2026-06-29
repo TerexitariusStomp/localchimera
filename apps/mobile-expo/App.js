@@ -2,14 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system';
+import frontendHtml from './frontend-html';
 
-const FRONTEND_URL = 'file:///android_asset/index.html';
 const LLAMA_MODEL = 'LLAMA_3_2_1B_INST_Q4_0';
 const WIKI_DIR = FileSystem.documentDirectory + 'llmwiki/';
 
 export default function App() {
   const [modelStatus, setModelStatus] = useState('initializing');
-  const [frontendUri, setFrontendUri] = useState(null);
   const [modelId, setModelId] = useState(null);
   const [webLoading, setWebLoading] = useState(true);
   const [webError, setWebError] = useState(null);
@@ -19,7 +18,6 @@ export default function App() {
     async function init() {
       try {
         await FileSystem.makeDirectoryAsync(WIKI_DIR, { intermediates: true }).catch(() => {});
-        setFrontendUri(FRONTEND_URL);
 
         const { loadModel } = await import('@qvac/sdk');
         setModelStatus('downloading model...');
@@ -256,15 +254,6 @@ export default function App() {
     })();
   `;
 
-  if (!frontendUri) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#00e5ff" />
-        <Text style={styles.text}>Loading Chimera...</Text>
-      </View>
-    );
-  }
-
   if (webError) {
     return (
       <View style={styles.container}>
@@ -278,7 +267,7 @@ export default function App() {
     <View style={styles.container}>
       <WebView
         ref={webViewRef}
-        source={{ uri: frontendUri }}
+        source={{ html: frontendHtml }}
         style={styles.webview}
         injectedJavaScript={injectedBridge}
         onMessage={handleWebViewMessage}

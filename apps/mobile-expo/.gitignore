@@ -8,3 +8,4 @@ web-build/
 *.orig.*
 *.log
 .DS_Store
+frontend-html.js
