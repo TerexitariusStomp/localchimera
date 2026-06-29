@@ -1,25 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text } from 'react-native';
-import { WebView } from 'react-native-webview';
+import * as FileSystem from 'expo-file-system';
 
 export default function App() {
-  const [ready, setReady] = useState(false);
+  const [dir, setDir] = useState('loading');
 
   useEffect(() => {
-    setReady(true);
+    try {
+      setDir(String(FileSystem.documentDirectory || 'null'));
+    } catch (e) {
+      setDir('Error: ' + e.message);
+    }
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#1a1a2e', paddingTop: 50 }}>
+    <View style={{ flex: 1, backgroundColor: '#1a1a2e', paddingTop: 100 }}>
       <Text style={{ color: '#00e5ff', fontSize: 24, textAlign: 'center', margin: 20 }}>
-        HELLO LOCALCHIMERA
+        FileSystem Test
       </Text>
-      {ready && (
-        <WebView
-          source={{ uri: 'https://new.localchimera.com/inference/' }}
-          style={{ flex: 1, backgroundColor: '#000' }}
-        />
-      )}
+      <Text style={{ color: '#fff', fontSize: 16, textAlign: 'center', margin: 20 }}>
+        {dir}
+      </Text>
     </View>
   );
 }
