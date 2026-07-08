@@ -13,9 +13,7 @@ COPY --from=cuda-runtime /usr/local/cuda /usr/local/cuda
 ENV PATH=/usr/local/cuda/bin:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir setuptools && \
-    pip install --no-cache-dir \
+RUN pip install --no-cache-dir \
     --index-url https://download.pytorch.org/whl/cu118 \
     torch==2.3.1+cu118 && \
     pip install --no-cache-dir \
@@ -31,8 +29,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --force-reinstall \
     --trusted-host pypi.zama.ai \
     --extra-index-url https://pypi.zama.ai/gpu \
-    concrete-python==2.10.0 && \
-    pip install --no-cache-dir --force-reinstall setuptools
+    concrete-python==2.10.0
+
+RUN pip install --no-cache-dir --force-reinstall setuptools && \
+    python -c "import pkg_resources; print('pkg_resources OK')"
 
 COPY optimizer.py /app/optimizer.py
 
