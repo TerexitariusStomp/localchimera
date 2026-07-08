@@ -1,8 +1,8 @@
-name = "new-localchimera"
+name = "recent-localchimera"
 compatibility_date = "2024-12-01"
 
 # Cloudflare Pages configuration
-pages_build_output_dir = "dist"
+pages_build_output_dir = "../../website-new"
 
 # Cloudflare KV namespace for domain registrar orders and contacts.
 [[kv_namespaces]]
