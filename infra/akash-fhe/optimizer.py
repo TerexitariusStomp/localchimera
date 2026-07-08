@@ -359,12 +359,16 @@ async def results():
 
 if __name__ == "__main__":
     import uvicorn
-    import multiprocessing
+    import subprocess
+    import sys
 
-    # Start optimization in a separate process (not thread) to avoid CUDA issues
+    # Start optimization as a separate Python subprocess to avoid CUDA thread/fork issues
     # The server starts immediately so health checks pass
-    opt_proc = multiprocessing.Process(target=_run_optimization, daemon=True)
-    opt_proc.start()
+    opt_cmd = [sys.executable, "-c",
+        "import sys; sys.path.insert(0, '/app'); "
+        "from optimizer import _run_optimization; _run_optimization()"]
+    opt_proc = subprocess.Popen(opt_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-    print(f"Optimization running in PID {opt_proc.pid}. Starting server...")
+    print(f"Optimization running as PID {opt_proc.pid}. Starting server...")
+    sys.stdout.flush()
     uvicorn.run(app, host="0.0.0.0", port=8080)
