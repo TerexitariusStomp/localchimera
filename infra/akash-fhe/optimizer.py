@@ -32,6 +32,9 @@ from fastapi.responses import JSONResponse
 
 app = FastAPI(title="FHE Batched No-Quality-Loss Optimizer", version="0.1.0")
 
+# Global subprocess handle for manual trigger
+opt_proc = None
+
 MODEL_ID = "LiquidAI/LFM2.5-230M"
 OUT_DIR = Path("/app/batched_opt")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
