@@ -9,6 +9,7 @@ massive throughput improvement.
 Also tests n_bits=5 with p_error=0.01 to see if that's sufficient.
 """
 import os
+import sys
 import time
 import json
 import shutil
@@ -331,6 +332,19 @@ def _run_optimization():
         _opt_status["running"] = False
         _opt_status["error"] = str(e)
         _write_status()
+
+
+@app.get("/start")
+async def start_optimization():
+    """Manually trigger optimization subprocess."""
+    global opt_proc
+    if opt_proc and opt_proc.poll() is None:
+        return JSONResponse(content={"status": "already_running"})
+    opt_cmd = [sys.executable, "-c",
+        "import sys; sys.path.insert(0, '/app'); "
+        "from optimizer import _run_optimization; _run_optimization()"]
+    opt_proc = subprocess.Popen(opt_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    return JSONResponse(content={"status": "started", "pid": opt_proc.pid})
 
 
 @app.get("/optimize")
