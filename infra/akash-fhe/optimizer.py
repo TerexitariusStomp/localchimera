@@ -175,7 +175,19 @@ async def health():
 
 _opt_status = {"running": False, "done": False, "progress": 0, "total": len(CONFIGS), "current": ""}
 _opt_results = None
-_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+_STATUS_FILE = OUT_DIR / "status.json"
+
+
+def _write_status():
+    with open(_STATUS_FILE, "w") as f:
+        json.dump(_opt_status, f)
+
+
+def _read_status():
+    if _STATUS_FILE.exists():
+        with open(_STATUS_FILE) as f:
+            return json.load(f)
+    return {"running": False, "done": False, "progress": 0, "total": len(CONFIGS), "current": ""}
 
 
 def _run_optimization():
@@ -185,11 +197,7 @@ def _run_optimization():
     _opt_status["running"] = True
     _opt_status["done"] = False
     _opt_status["progress"] = 0
-
-    # Initialize CUDA context in this thread
-    torch.cuda.init()
-    torch.cuda.set_device(0)
-    _ = torch.zeros(1, device="cuda")  # force context creation
+    _write_status()
 
     try:
         w, config = _load()
@@ -269,6 +277,7 @@ def _run_optimization():
             print(f"  {label}: {r['tokens_per_min']:.1f} tok/min, full_cos={r['full_cosine']:.4f}")
             _opt_status["progress"] = idx + 1
             _opt_status["current"] = label
+            _write_status()
 
         # Pick best
         best = None
@@ -312,6 +321,7 @@ def _run_optimization():
         _opt_results = output
         _opt_status["done"] = True
         _opt_status["running"] = False
+        _write_status()
 
     except Exception as e:
         print(f"ERROR: {e}")
@@ -320,23 +330,19 @@ def _run_optimization():
         _opt_status["done"] = True
         _opt_status["running"] = False
         _opt_status["error"] = str(e)
+        _write_status()
 
 
 @app.get("/optimize")
 async def optimize():
-    """Start optimization in background. Returns immediately."""
-    if _opt_status["running"]:
-        return JSONResponse(content={"status": "already_running", **_opt_status})
-    if _opt_status["done"] and _opt_results is not None:
-        return JSONResponse(content={"status": "already_done", **_opt_status})
-
-    asyncio.get_event_loop().run_in_executor(_executor, _run_optimization)
-    return JSONResponse(content={"status": "started", **_opt_status})
+    """Report optimization status. Runs at startup in child process."""
+    s = _read_status()
+    return JSONResponse(content={"status": "running" if s.get("running") else "done" if s.get("done") else "idle", **s})
 
 
 @app.get("/status")
 async def status():
-    return JSONResponse(content=_opt_status)
+    return JSONResponse(content=_read_status())
 
 
 @app.get("/results")
@@ -353,4 +359,12 @@ async def results():
 
 if __name__ == "__main__":
     import uvicorn
+    import multiprocessing
+
+    # Start optimization in a separate process (not thread) to avoid CUDA issues
+    # The server starts immediately so health checks pass
+    opt_proc = multiprocessing.Process(target=_run_optimization, daemon=True)
+    opt_proc.start()
+
+    print(f"Optimization running in PID {opt_proc.pid}. Starting server...")
     uvicorn.run(app, host="0.0.0.0", port=8080)
