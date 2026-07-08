@@ -31,7 +31,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --force-reinstall \
     --trusted-host pypi.zama.ai \
     --extra-index-url https://pypi.zama.ai/gpu \
-    concrete-python==2.10.0
+    concrete-python==2.10.0 && \
+    pip install --no-cache-dir --force-reinstall setuptools
 
 COPY optimizer.py /app/optimizer.py
 
