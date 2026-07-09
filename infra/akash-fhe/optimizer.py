@@ -166,6 +166,7 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
         "cosine": avg_cos,
         "batch_size": batch_size,
         "tokens_per_min": tokens_per_min,
+        "fhe_result": result,
     }
 
 
@@ -249,13 +250,8 @@ def _run_optimization():
                     n_bits, p_error, batch_size
                 )
 
-                # Full quality with U reconstruction
-                client = FHEModelClient(out_dir)
-                eval_keys = client.get_serialized_evaluation_keys()
-                encrypted = client.quantize_encrypt_serialize(x_np)
-                server = FHEModelServer(out_dir)
-                enc_out = server.run(encrypted, eval_keys)
-                fhe_small = client.deserialize_decrypt_dequantize(enc_out)
+                # Full quality with U reconstruction (reuse FHE result from compile_and_test)
+                fhe_small = r["fhe_result"]
 
                 U_np = U_k.numpy()
                 reconstructed = fhe_small @ U_np.T
@@ -277,6 +273,7 @@ def _run_optimization():
             r["n_bits"] = n_bits
             r["p_error"] = p_error
             r["tokens_per_min"] = batch_size * 60 / r["inference_time"]
+            del r["fhe_result"]
             results.append(r)
             print(f"  {label}: {r['tokens_per_min']:.1f} tok/min, full_cos={r['full_cosine']:.4f}")
             _opt_status["progress"] = idx + 1
