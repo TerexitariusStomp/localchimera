@@ -113,9 +113,10 @@ def _svd_decompose(weight_matrix, k):
 
 def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_dir,
                                n_bits, p_error, batch_size):
+    import shutil
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    for f in out_dir.iterdir():
-        f.unlink()
 
     calib = torch.randn(*input_shape)
     kwargs = dict(n_bits=n_bits, p_error=p_error, device="cuda")
@@ -132,10 +133,7 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
     encrypted = client.quantize_encrypt_serialize(test_input)
 
     server = FHEModelServer(out_dir)
-    try:
-        _ = server.run(encrypted, eval_keys)
-    except Exception:
-        pass
+    _ = server.run(encrypted, eval_keys)
 
     times = []
     for _ in range(5):
@@ -202,7 +200,13 @@ def _run_optimization():
     _opt_status["running"] = True
     _opt_status["done"] = False
     _opt_status["progress"] = 0
+    _opt_status.pop("error", None)
     _write_status()
+
+    import shutil
+    if OUT_DIR.exists():
+        shutil.rmtree(OUT_DIR)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     try:
         w, config = _load()
