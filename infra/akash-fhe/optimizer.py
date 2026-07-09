@@ -344,11 +344,22 @@ async def start_optimization():
     global opt_proc
     if opt_proc and opt_proc.poll() is None:
         return JSONResponse(content={"status": "already_running"})
+    log_file = open("/app/opt_subprocess.log", "w")
     opt_cmd = [sys.executable, "-c",
         "import sys; sys.path.insert(0, '/app'); "
         "from optimizer import _run_optimization; _run_optimization()"]
-    opt_proc = subprocess.Popen(opt_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    opt_proc = subprocess.Popen(opt_cmd, stdout=log_file, stderr=subprocess.STDOUT)
     return JSONResponse(content={"status": "started", "pid": opt_proc.pid})
+
+
+@app.get("/logs")
+async def get_logs():
+    """Read subprocess logs for debugging."""
+    try:
+        with open("/app/opt_subprocess.log") as f:
+            return JSONResponse(content={"logs": f.read()[-3000:]})
+    except Exception as e:
+        return JSONResponse(content={"logs": "", "error": str(e)})
 
 
 @app.get("/optimize")
