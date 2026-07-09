@@ -113,11 +113,6 @@ def _svd_decompose(weight_matrix, k):
 
 def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_dir,
                                n_bits, p_error, batch_size):
-    import shutil
-    if out_dir.exists():
-        shutil.rmtree(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     calib = torch.randn(*input_shape)
     kwargs = dict(n_bits=n_bits, p_error=p_error, device="cuda")
 
@@ -126,23 +121,24 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
     circuit = compile_torch_model(module, calib, **kwargs)
     compile_time = time.time() - t0
 
-    FHEModelDev(out_dir, circuit).save()
+    # Use circuit directly — avoid FHEModelDev/Client/Server save/load which
+    # can load stale circuits from disk when configs share the same out_dir structure
+    test_tensor = torch.from_numpy(test_input)
+    encrypted = circuit.encrypt(test_tensor)
+    eval_keys = circuit.keygen()
 
-    client = FHEModelClient(out_dir)
-    eval_keys = client.get_serialized_evaluation_keys()
-    encrypted = client.quantize_encrypt_serialize(test_input)
-
-    server = FHEModelServer(out_dir)
-    _ = server.run(encrypted, eval_keys)
+    _ = circuit.run(encrypted, eval_keys)
 
     times = []
     for _ in range(5):
         t0 = time.time()
-        enc_out = server.run(encrypted, eval_keys)
+        enc_out = circuit.run(encrypted, eval_keys)
         times.append(time.time() - t0)
 
     inference_time = min(times)
-    result = client.deserialize_decrypt_dequantize(enc_out)
+    result = circuit.decrypt(enc_out)
+    if isinstance(result, torch.Tensor):
+        result = result.numpy()
 
     cosines = []
     for i in range(batch_size):
