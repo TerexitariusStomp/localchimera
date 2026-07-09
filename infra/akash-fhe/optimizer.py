@@ -32,7 +32,7 @@ from fastapi.responses import JSONResponse
 
 app = FastAPI(title="FHE Batched No-Quality-Loss Optimizer", version="0.1.0")
 
-# Global subprocess handle for manual trigger
+# Global thread handle for manual trigger
 opt_proc = None
 
 MODEL_ID = "LiquidAI/LFM2.5-230M"
@@ -338,22 +338,26 @@ def _run_optimization():
 
 @app.get("/start")
 async def start_optimization():
-    """Manually trigger optimization subprocess."""
+    """Manually trigger optimization in a background thread."""
     global opt_proc
-    if opt_proc and opt_proc.poll() is None:
+    if opt_proc and opt_proc.is_alive():
         return JSONResponse(content={"status": "already_running"})
     log_file = open("/app/opt_subprocess.log", "w", buffering=1)
-    opt_cmd = [sys.executable, "-u", "-c",
-        "import sys, traceback; sys.path.insert(0, '/app'); "
-        "try: "
-        "from optimizer import _run_optimization; _run_optimization(); "
-        "except Exception as e: "
-        "traceback.print_exc(); "
-        "print('FATAL:', e, flush=True)"]
-    env = dict(os.environ)
-    env["PYTHONUNBUFFERED"] = "1"
-    opt_proc = subprocess.Popen(opt_cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
-    return JSONResponse(content={"status": "started", "pid": opt_proc.pid})
+    
+    import threading
+    def run_with_logging():
+        import contextlib
+        with contextlib.redirect_stdout(log_file), contextlib.redirect_stderr(log_file):
+            try:
+                _run_optimization()
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(f"FATAL: {e}", flush=True)
+    
+    opt_proc = threading.Thread(target=run_with_logging, daemon=True)
+    opt_proc.start()
+    return JSONResponse(content={"status": "started", "thread": True})
 
 
 @app.get("/logs")
