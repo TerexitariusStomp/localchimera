@@ -120,8 +120,10 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
     kwargs = dict(n_bits=n_bits, p_error=p_error, device="cuda")
 
     print(f"  Compiling {name} (n_bits={n_bits}, p_error={p_error}, batch={batch_size})...", flush=True)
+    print(f"    calib shape: {calib.shape}, test_input shape: {test_input.shape}", flush=True)
     t0 = time.time()
     circuit = compile_torch_model(module, calib, **kwargs)
+    print(f"    circuit input shapes: {circuit.inputs}", flush=True)
     compile_time = time.time() - t0
 
     FHEModelDev(work_dir, circuit).save()
