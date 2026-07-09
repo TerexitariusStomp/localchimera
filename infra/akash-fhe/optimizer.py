@@ -113,32 +113,34 @@ def _svd_decompose(weight_matrix, k):
 
 def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_dir,
                                n_bits, p_error, batch_size):
+    import tempfile
+    work_dir = Path(tempfile.mkdtemp(prefix=f"fhe_{name}_"))
+
     calib = torch.randn(*input_shape)
     kwargs = dict(n_bits=n_bits, p_error=p_error, device="cuda")
 
-    print(f"  Compiling {name} (n_bits={n_bits}, p_error={p_error}, batch={batch_size})...")
+    print(f"  Compiling {name} (n_bits={n_bits}, p_error={p_error}, batch={batch_size})...", flush=True)
     t0 = time.time()
     circuit = compile_torch_model(module, calib, **kwargs)
     compile_time = time.time() - t0
 
-    # Use circuit directly — avoid FHEModelDev/Client/Server save/load which
-    # can load stale circuits from disk when configs share the same out_dir structure
-    test_tensor = torch.from_numpy(test_input)
-    encrypted = circuit.encrypt(test_tensor)
-    eval_keys = circuit.keygen()
+    FHEModelDev(work_dir, circuit).save()
 
-    _ = circuit.run(encrypted, eval_keys)
+    client = FHEModelClient(work_dir)
+    eval_keys = client.get_serialized_evaluation_keys()
+    encrypted = client.quantize_encrypt_serialize(test_input)
+
+    server = FHEModelServer(work_dir)
+    _ = server.run(encrypted, eval_keys)
 
     times = []
     for _ in range(5):
         t0 = time.time()
-        enc_out = circuit.run(encrypted, eval_keys)
+        enc_out = server.run(encrypted, eval_keys)
         times.append(time.time() - t0)
 
     inference_time = min(times)
-    result = circuit.decrypt(enc_out)
-    if isinstance(result, torch.Tensor):
-        result = result.numpy()
+    result = client.deserialize_decrypt_dequantize(enc_out)
 
     cosines = []
     for i in range(batch_size):
@@ -340,11 +342,17 @@ async def start_optimization():
     global opt_proc
     if opt_proc and opt_proc.poll() is None:
         return JSONResponse(content={"status": "already_running"})
-    log_file = open("/app/opt_subprocess.log", "w")
-    opt_cmd = [sys.executable, "-c",
-        "import sys; sys.path.insert(0, '/app'); "
-        "from optimizer import _run_optimization; _run_optimization()"]
-    opt_proc = subprocess.Popen(opt_cmd, stdout=log_file, stderr=subprocess.STDOUT)
+    log_file = open("/app/opt_subprocess.log", "w", buffering=1)
+    opt_cmd = [sys.executable, "-u", "-c",
+        "import sys, traceback; sys.path.insert(0, '/app'); "
+        "try: "
+        "from optimizer import _run_optimization; _run_optimization(); "
+        "except Exception as e: "
+        "traceback.print_exc(); "
+        "print('FATAL:', e, flush=True)"]
+    env = dict(os.environ)
+    env["PYTHONUNBUFFERED"] = "1"
+    opt_proc = subprocess.Popen(opt_cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
     return JSONResponse(content={"status": "started", "pid": opt_proc.pid})
 
 
