@@ -120,10 +120,8 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
     kwargs = dict(n_bits=n_bits, p_error=p_error, device="cuda")
 
     print(f"  Compiling {name} (n_bits={n_bits}, p_error={p_error}, batch={batch_size})...", flush=True)
-    print(f"    calib shape: {calib.shape}, test_input shape: {test_input.shape}", flush=True)
     t0 = time.time()
     circuit = compile_torch_model(module, calib, **kwargs)
-    print(f"    circuit input shapes: {circuit.inputs}", flush=True)
     compile_time = time.time() - t0
 
     FHEModelDev(work_dir, circuit).save()
@@ -156,7 +154,7 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
     tokens_per_min = batch_size * 60 / inference_time
 
     print(f"    compile={compile_time:.1f}s, inference={inference_time:.3f}s, "
-          f"batch={batch_size}, cos={avg_cos:.4f}, {tokens_per_min:.1f} tok/min")
+          f"batch={batch_size}, cos={avg_cos:.4f}, {tokens_per_min:.1f} tok/min", flush=True)
 
     return {
         "compile_time": compile_time,
@@ -166,6 +164,76 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
         "tokens_per_min": tokens_per_min,
         "fhe_result": result,
     }
+
+
+def _run_single_config(idx, rank, n_bits, p_error, batch_size, label, hidden,
+                        composed_all_np):
+    """Run a single config in its own subprocess to avoid compile_torch_model caching."""
+    import tempfile, pickle
+    result_file = Path(tempfile.mktemp(prefix=f"fhe_result_{label}_"))
+    wrapper = Path(tempfile.mktemp(prefix="fhe_single_", suffix=".py"))
+
+    wrapper.write_text(
+        f"import sys, json, pickle, time, traceback\n"
+        f"sys.path.insert(0, '/app')\n"
+        f"import numpy as np, torch, torch.nn as nn\n"
+        f"from optimizer import _compile_and_test_batched, _svd_decompose, QUALITY_THRESHOLD\n"
+        f"hidden = {hidden}\n"
+        f"composed_all = torch.from_numpy(np.load('/tmp/_composed_all.npy'))\n"
+        f"batch_size = {batch_size}\n"
+        f"x_np = np.load('/tmp/_test_input.npy')\n"
+        f"x_t = torch.from_numpy(x_np)\n"
+        f"ref_full = (x_t @ composed_all.T).numpy()\n"
+        f"rank = {rank}\n"
+        f"if rank >= 8192:\n"
+        f"    mod = nn.Linear(hidden, composed_all.shape[0], bias=False)\n"
+        f"    mod.weight.data = composed_all\n"
+        f"    ref = ref_full\n"
+        f"    r = _compile_and_test_batched(mod, '{label}', (batch_size, hidden), ref, x_np, None, {n_bits}, {p_error}, batch_size)\n"
+        f"    r['full_cosine'] = r['cosine']\n"
+        f"    r['strategy'] = 'full'\n"
+        f"else:\n"
+        f"    U_k, V_k = _svd_decompose(composed_all, rank)\n"
+        f"    mod = nn.Linear(hidden, rank, bias=False)\n"
+        f"    mod.weight.data = V_k\n"
+        f"    ref = (x_t @ V_k.T).numpy()\n"
+        f"    r = _compile_and_test_batched(mod, '{label}', (batch_size, hidden), ref, x_np, None, {n_bits}, {p_error}, batch_size)\n"
+        f"    fhe_small = r['fhe_result']\n"
+        f"    U_np = U_k.numpy()\n"
+        f"    reconstructed = fhe_small @ U_np.T\n"
+        f"    full_cosines = []\n"
+        f"    for i in range(batch_size):\n"
+        f"        r_flat = reconstructed[i].flatten()\n"
+        f"        ref_flat = ref_full[i].flatten()\n"
+        f"        c = np.dot(r_flat, ref_flat) / (np.linalg.norm(r_flat) * np.linalg.norm(ref_flat) + 1e-10)\n"
+        f"        full_cosines.append(c)\n"
+        f"    r['full_cosine'] = float(np.mean(full_cosines))\n"
+        f"    r['strategy'] = 'lowrank'\n"
+        f"r['label'] = '{label}'\n"
+        f"r['rank'] = rank\n"
+        f"r['n_bits'] = {n_bits}\n"
+        f"r['p_error'] = {p_error}\n"
+        f"r['tokens_per_min'] = batch_size * 60 / r['inference_time']\n"
+        f"del r['fhe_result']\n"
+        f"pickle.dump(r, open('{result_file}', 'wb'))\n"
+        f"print('DONE', flush=True)\n"
+    )
+
+    env = dict(os.environ)
+    env["PYTHONUNBUFFERED"] = "1"
+    proc = subprocess.run(
+        [sys.executable, "-u", str(wrapper)],
+        env=env, capture_output=True, text=True, timeout=1800
+    )
+    print(proc.stdout, flush=True)
+    if proc.returncode != 0:
+        print(f"  SUBPROCESS ERROR for {label}:\n{proc.stderr}", flush=True)
+        raise RuntimeError(f"Subprocess failed for {label}: {proc.stderr[-500:]})")
+
+    r = pickle.load(open(result_file, 'rb'))
+    result_file.unlink(missing_ok=True)
+    wrapper.unlink(missing_ok=True)
+    return r
 
 
 @app.get("/health")
@@ -221,65 +289,20 @@ def _run_optimization():
         composed_all = torch.cat([
             w["q"], w["k"], w["v"], w["o"], w["w1"], w["w3"]
         ], dim=0)
+        np.save("/tmp/_composed_all.npy", composed_all.numpy())
 
         results = []
 
         for idx, (rank, n_bits, p_error, batch_size, label) in enumerate(CONFIGS):
+            print(f"\n[{idx+1}/{len(CONFIGS)}] {label}", flush=True)
+
             x_np = np.random.randn(batch_size, hidden).astype(np.float32)
-            x_t = torch.from_numpy(x_np)
-            ref_full = (x_t @ composed_all.T).numpy()
+            np.save("/tmp/_test_input.npy", x_np)
 
-            if rank >= 8192:
-                # Full circuit, no SVD
-                mod = nn.Linear(hidden, composed_all.shape[0], bias=False)
-                mod.weight.data = composed_all
-                ref = ref_full
-                out_dir = OUT_DIR / label
-                r = _compile_and_test_batched(
-                    mod, label, (batch_size, hidden), ref, x_np, out_dir,
-                    n_bits, p_error, batch_size
-                )
-                r["full_cosine"] = r["cosine"]
-                r["strategy"] = "full"
-            else:
-                # Low-rank SVD
-                U_k, V_k = _svd_decompose(composed_all, rank)
-                mod = nn.Linear(hidden, rank, bias=False)
-                mod.weight.data = V_k
-                ref = (x_t @ V_k.T).numpy()
+            r = _run_single_config(idx, rank, n_bits, p_error, batch_size, label,
+                                   hidden, composed_all.numpy())
 
-                out_dir = OUT_DIR / label
-                r = _compile_and_test_batched(
-                    mod, label, (batch_size, hidden), ref, x_np, out_dir,
-                    n_bits, p_error, batch_size
-                )
-
-                # Full quality with U reconstruction (reuse FHE result from compile_and_test)
-                fhe_small = r["fhe_result"]
-
-                U_np = U_k.numpy()
-                reconstructed = fhe_small @ U_np.T
-
-                full_cosines = []
-                for i in range(batch_size):
-                    r_flat = reconstructed[i].flatten()
-                    ref_flat = ref_full[i].flatten()
-                    c = np.dot(r_flat, ref_flat) / (
-                        np.linalg.norm(r_flat) * np.linalg.norm(ref_flat) + 1e-10
-                    )
-                    full_cosines.append(c)
-
-                r["full_cosine"] = float(np.mean(full_cosines))
-                r["strategy"] = "lowrank"
-
-            r["label"] = label
-            r["rank"] = rank
-            r["n_bits"] = n_bits
-            r["p_error"] = p_error
-            r["tokens_per_min"] = batch_size * 60 / r["inference_time"]
-            del r["fhe_result"]
-            results.append(r)
-            print(f"  {label}: {r['tokens_per_min']:.1f} tok/min, full_cos={r['full_cosine']:.4f}")
+            print(f"  {label}: {r['tokens_per_min']:.1f} tok/min, full_cos={r['full_cosine']:.4f}", flush=True)
             _opt_status["progress"] = idx + 1
             _opt_status["current"] = label
             _write_status()
