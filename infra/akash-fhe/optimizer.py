@@ -343,13 +343,19 @@ async def start_optimization():
     if opt_proc and opt_proc.poll() is None:
         return JSONResponse(content={"status": "already_running"})
     log_file = open("/app/opt_subprocess.log", "w", buffering=1)
-    opt_cmd = [sys.executable, "-u", "-c",
-        "import sys, traceback; sys.path.insert(0, '/app'); "
-        "try: "
-        "from optimizer import _run_optimization; _run_optimization(); "
-        "except Exception as e: "
-        "traceback.print_exc(); "
-        "print('FATAL:', e, flush=True)"]
+    wrapper = "/app/_run_opt.py"
+    with open(wrapper, "w") as f:
+        f.write(
+            "import sys, traceback\n"
+            "sys.path.insert(0, '/app')\n"
+            "try:\n"
+            "    from optimizer import _run_optimization\n"
+            "    _run_optimization()\n"
+            "except Exception as e:\n"
+            "    traceback.print_exc()\n"
+            "    print('FATAL:', e, flush=True)\n"
+        )
+    opt_cmd = [sys.executable, "-u", wrapper]
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
     opt_proc = subprocess.Popen(opt_cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
