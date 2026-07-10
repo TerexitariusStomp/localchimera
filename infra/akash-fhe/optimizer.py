@@ -111,12 +111,39 @@ def _svd_decompose(weight_matrix, k):
     return U_k, V_k
 
 
+class BatchedLinear(nn.Module):
+    """Wraps nn.Linear to accept flattened batch input for FHE compilation.
+    
+    Concrete-ML's compile_torch_model infers input shape from the first dimension of
+    calibration data, treating it as a sample dimension. So a (4, 1024) inputset
+    results in a circuit expecting (1, 1024). This wrapper flattens the batch
+    dimension into the feature dimension so the circuit sees (batch*hidden,) input
+    and produces (batch*output_size,) output.
+    """
+    def __init__(self, linear, batch_size):
+        super().__init__()
+        self.linear = linear
+        self.batch_size = batch_size
+        self.in_features = linear.in_features
+        self.out_features = linear.out_features
+        
+    def forward(self, x):
+        # x shape: (batch_size * in_features,)
+        x = x.reshape(self.batch_size, self.in_features)
+        out = self.linear(x)
+        return out.flatten()
+
+
 def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_dir,
                                n_bits, p_error, batch_size):
     import tempfile
     work_dir = Path(tempfile.mkdtemp(prefix=f"fhe_{name}_"))
 
-    calib = torch.randn(*input_shape)
+    if batch_size > 1:
+        module = BatchedLinear(module, batch_size)
+        calib = torch.randn(batch_size * input_shape[1])
+    else:
+        calib = torch.randn(*input_shape)
     kwargs = dict(n_bits=n_bits, p_error=p_error, device="cuda")
 
     print(f"  Compiling {name} (n_bits={n_bits}, p_error={p_error}, batch={batch_size})...", flush=True)
@@ -128,7 +155,11 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
 
     client = FHEModelClient(work_dir)
     eval_keys = client.get_serialized_evaluation_keys()
-    encrypted = client.quantize_encrypt_serialize(test_input)
+    if batch_size > 1:
+        enc_input = test_input.flatten()
+    else:
+        enc_input = test_input
+    encrypted = client.quantize_encrypt_serialize(enc_input)
 
     server = FHEModelServer(work_dir)
     _ = server.run(encrypted, eval_keys)
@@ -141,6 +172,8 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
 
     inference_time = min(times)
     result = client.deserialize_decrypt_dequantize(enc_out)
+    if batch_size > 1:
+        result = result.reshape(batch_size, -1)
 
     cosines = []
     for i in range(batch_size):
