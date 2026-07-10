@@ -34,6 +34,7 @@ RUN pip install --no-cache-dir \
 RUN pip install --no-cache-dir "setuptools<81" && \
     python -c "import pkg_resources; print('pkg_resources OK')"
 
+ARG CACHE_BUST=1
 COPY optimizer.py /app/optimizer.py
 
 EXPOSE 8080

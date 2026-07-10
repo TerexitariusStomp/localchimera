@@ -332,10 +332,14 @@ def _run_optimization():
             x_np = np.random.randn(batch_size, hidden).astype(np.float32)
             np.save("/tmp/_test_input.npy", x_np)
 
-            r = _run_single_config(idx, rank, n_bits, p_error, batch_size, label,
-                                   hidden, composed_all.numpy())
-
-            print(f"  {label}: {r['tokens_per_min']:.1f} tok/min, full_cos={r['full_cosine']:.4f}", flush=True)
+            try:
+                r = _run_single_config(idx, rank, n_bits, p_error, batch_size, label,
+                                       hidden, composed_all.numpy())
+                print(f"  {label}: {r['tokens_per_min']:.1f} tok/min, full_cos={r['full_cosine']:.4f}", flush=True)
+                results.append(r)
+            except Exception as e:
+                print(f"  {label}: FAILED - {e}", flush=True)
+                results.append({"label": label, "error": str(e), "tokens_per_min": 0, "full_cosine": 0})
             _opt_status["progress"] = idx + 1
             _opt_status["current"] = label
             _write_status()
