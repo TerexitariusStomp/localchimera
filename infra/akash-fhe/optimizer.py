@@ -347,28 +347,37 @@ def _run_optimization():
         # Pick best
         best = None
         for r in results:
+            if "error" in r:
+                continue
             if r["full_cosine"] >= QUALITY_THRESHOLD:
                 if best is None or r["tokens_per_min"] > best["tokens_per_min"]:
                     best = r
 
         if best is None:
             for r in results:
+                if "error" in r:
+                    continue
                 if r["full_cosine"] >= 0.90:
                     if best is None or r["tokens_per_min"] > best["tokens_per_min"]:
                         best = r
 
         if best is None:
-            best = max(results, key=lambda r: r["tokens_per_min"])
-            print(f"\n  WARNING: No config met quality threshold {QUALITY_THRESHOLD}")
+            valid = [r for r in results if "error" not in r]
+            if valid:
+                best = max(valid, key=lambda r: r["tokens_per_min"])
+                print(f"\n  WARNING: No config met quality threshold {QUALITY_THRESHOLD}")
 
         print("\n" + "=" * 70)
         print("ALL RESULTS (sorted by speed)")
         print("=" * 70)
-        for r in sorted(results, key=lambda x: x["tokens_per_min"], reverse=True):
+        for r in sorted(results, key=lambda x: x.get("tokens_per_min", 0), reverse=True):
             marker = " *** BEST" if r is best else ""
-            print(f"  {r['label']:>25s}: {r['tokens_per_min']:7.1f} tok/min, "
-                  f"full_cos={r['full_cosine']:.4f}, "
-                  f"time={r['inference_time']:.3f}s, batch={r['batch_size']}{marker}")
+            if "error" in r:
+                print(f"  {r['label']:>25s}: FAILED - {r['error'][:60]}{marker}")
+            else:
+                print(f"  {r['label']:>25s}: {r['tokens_per_min']:7.1f} tok/min, "
+                      f"full_cos={r['full_cosine']:.4f}, "
+                      f"time={r['inference_time']:.3f}s, batch={r['batch_size']}{marker}")
         print("=" * 70)
         print(f"BEST: {best['label']}, {best['tokens_per_min']:.1f} tok/min, "
               f"quality={best['full_cosine']:.4f}")
