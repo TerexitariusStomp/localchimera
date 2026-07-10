@@ -141,7 +141,7 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
 
     if batch_size > 1:
         module = BatchedLinear(module, batch_size)
-        calib = torch.randn(batch_size * input_shape[1])
+        calib = torch.randn(10, batch_size * input_shape[1])
     else:
         calib = torch.randn(*input_shape)
     kwargs = dict(n_bits=n_bits, p_error=p_error, device="cuda")
