@@ -129,9 +129,10 @@ class BatchedLinear(nn.Module):
         
     def forward(self, x):
         # x shape: (batch_size * in_features,)
-        x = x.reshape(self.batch_size, self.in_features)
-        out = self.linear(x)
-        return out.flatten()
+        # Split into batch chunks, apply linear, then concatenate
+        chunks = torch.split(x, self.in_features)
+        outs = [self.linear(chunk.unsqueeze(0)) for chunk in chunks]
+        return torch.cat([o.squeeze(0) for o in outs])
 
 
 def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_dir,
