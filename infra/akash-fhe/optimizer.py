@@ -45,35 +45,29 @@ CONFIGS = [
     # Baseline: full composed, no low-rank, batch=1
     (1024, 5, 0.02, 1, "baseline_full"),
 
-    # Full rank (lossless SVD) with various precision, batched
-    (1024, 5, 0.01, 1, "r1024_n5_pe01_b1"),
-    (1024, 5, 0.01, 4, "r1024_n5_pe01_b4"),
-    (1024, 5, 0.01, 8, "r1024_n5_pe01_b8"),
-    (1024, 5, 0.01, 16, "r1024_n5_pe01_b16"),
-    (1024, 5, 0.01, 32, "r1024_n5_pe01_b32"),
-
-    (1024, 6, 0.01, 1, "r1024_n6_pe01_b1"),
-    (1024, 6, 0.01, 4, "r1024_n6_pe01_b4"),
-    (1024, 6, 0.01, 8, "r1024_n6_pe01_b8"),
-    (1024, 6, 0.01, 16, "r1024_n6_pe01_b16"),
-    (1024, 6, 0.01, 32, "r1024_n6_pe01_b32"),
-
+    # Full rank (lossless SVD) batch=1 — highest quality, parallel tested
     (1024, 7, 0.01, 1, "r1024_n7_pe01_b1"),
-    (1024, 7, 0.01, 8, "r1024_n7_pe01_b8"),
-    (1024, 7, 0.01, 16, "r1024_n7_pe01_b16"),
-    (1024, 7, 0.01, 32, "r1024_n7_pe01_b32"),
+    (1024, 7, 0.005, 1, "r1024_n7_pe005_b1"),
+    (1024, 6, 0.01, 1, "r1024_n6_pe01_b1"),
+    (1024, 6, 0.005, 1, "r1024_n6_pe005_b1"),
+    (1024, 5, 0.01, 1, "r1024_n5_pe01_b1"),
 
-    # Also test p_error=0.005 for max quality
-    (1024, 6, 0.005, 8, "r1024_n6_pe005_b8"),
-    (1024, 6, 0.005, 16, "r1024_n6_pe005_b16"),
-    (1024, 7, 0.005, 8, "r1024_n7_pe005_b8"),
-    (1024, 7, 0.005, 16, "r1024_n7_pe005_b16"),
+    # Block-diagonal batched (small batches, low-rank only)
+    (1024, 7, 0.01, 2, "r1024_n7_pe01_b2"),
+    (1024, 7, 0.01, 4, "r1024_n7_pe01_b4"),
+    (1024, 6, 0.01, 2, "r1024_n6_pe01_b2"),
+    (1024, 6, 0.01, 4, "r1024_n6_pe01_b4"),
+    (1024, 7, 0.005, 2, "r1024_n7_pe005_b2"),
+    (1024, 7, 0.005, 4, "r1024_n7_pe005_b4"),
 
-    # Direct full circuit (no SVD) batched for comparison
-    (8192, 5, 0.02, 4, "full_n5_b4"),
-    (8192, 5, 0.02, 8, "full_n5_b8"),
-    (8192, 6, 0.01, 4, "full_n6_b4"),
-    (8192, 6, 0.01, 8, "full_n6_b8"),
+    # Lower precision for speed comparison
+    (1024, 4, 0.01, 1, "r1024_n4_pe01_b1"),
+    (1024, 4, 0.01, 2, "r1024_n4_pe01_b2"),
+    (1024, 4, 0.01, 4, "r1024_n4_pe01_b4"),
+
+    # Full composed (no SVD) batch=1 only — too large for block-diag
+    (8192, 6, 0.01, 1, "full_n6_b1"),
+    (8192, 7, 0.01, 1, "full_n7_b1"),
 ]
 
 QUALITY_THRESHOLD = 0.95
@@ -111,28 +105,26 @@ def _svd_decompose(weight_matrix, k):
     return U_k, V_k
 
 
-class BatchedLinear(nn.Module):
-    """Wraps nn.Linear to accept flattened batch input for FHE compilation.
+class BlockDiagLinear(nn.Module):
+    """Block-diagonal linear layer for batched FHE inference.
     
-    Concrete-ML's compile_torch_model infers input shape from the first dimension of
-    calibration data, treating it as a sample dimension. So a (4, 1024) inputset
-    results in a circuit expecting (1, 1024). This wrapper flattens the batch
-    dimension into the feature dimension so the circuit sees (batch*hidden,) input
-    and produces (batch*output_size,) output.
+    Creates a single nn.Linear with block-diagonal weights so each block
+    processes one sample independently. No reshape needed — just one matmul.
+    Quality is identical to batch=1 since each block is the same weight matrix.
     """
-    def __init__(self, linear, batch_size):
+    def __init__(self, weight, batch_size):
         super().__init__()
-        self.linear = linear
+        in_features = weight.shape[1]
+        out_features = weight.shape[0]
+        block_weight = torch.block_diag(*([weight] * batch_size))
+        self.linear = nn.Linear(batch_size * in_features, batch_size * out_features, bias=False)
+        self.linear.weight.data = block_weight
         self.batch_size = batch_size
-        self.in_features = linear.in_features
-        self.out_features = linear.out_features
+        self.in_features = in_features
+        self.out_features = out_features
         
     def forward(self, x):
-        # x shape: (batch_size * in_features,)
-        # Split into batch chunks, apply linear, then concatenate
-        chunks = torch.split(x, self.in_features)
-        outs = [self.linear(chunk.unsqueeze(0)) for chunk in chunks]
-        return torch.cat([o.squeeze(0) for o in outs])
+        return self.linear(x)
 
 
 def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_dir,
@@ -141,7 +133,8 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
     work_dir = Path(tempfile.mkdtemp(prefix=f"fhe_{name}_"))
 
     if batch_size > 1:
-        module = BatchedLinear(module, batch_size)
+        weight = module.weight.data
+        module = BlockDiagLinear(weight, batch_size)
         calib = torch.randn(10, batch_size * input_shape[1])
     else:
         calib = torch.randn(*input_shape)
@@ -187,8 +180,28 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
     avg_cos = float(np.mean(cosines))
     tokens_per_min = batch_size * 60 / inference_time
 
-    print(f"    compile={compile_time:.1f}s, inference={inference_time:.3f}s, "
-          f"batch={batch_size}, cos={avg_cos:.4f}, {tokens_per_min:.1f} tok/min", flush=True)
+    # Test parallel circuit execution (run multiple inferences concurrently)
+    parallel_tpm = None
+    parallel_n = 8
+    try:
+        enc_inputs = [client.quantize_encrypt_serialize(
+            torch.randn(batch_size * input_shape[1]) if batch_size > 1 else torch.randn(*input_shape)
+        ) for _ in range(parallel_n)]
+        servers = [FHEModelServer(work_dir) for _ in range(parallel_n)]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_n) as executor:
+            t0 = time.time()
+            futures = [executor.submit(servers[i].run, enc_inputs[i], eval_keys)
+                       for i in range(parallel_n)]
+            _ = [f.result() for f in futures]
+            parallel_time = time.time() - t0
+        parallel_tpm = parallel_n * batch_size * 60 / parallel_time
+        print(f"    compile={compile_time:.1f}s, inference={inference_time:.3f}s, "
+              f"batch={batch_size}, cos={avg_cos:.4f}, {tokens_per_min:.1f} tok/min, "
+              f"parallel x{parallel_n}={parallel_tpm:.1f} tok/min", flush=True)
+    except Exception as e:
+        print(f"    compile={compile_time:.1f}s, inference={inference_time:.3f}s, "
+              f"batch={batch_size}, cos={avg_cos:.4f}, {tokens_per_min:.1f} tok/min, "
+              f"parallel failed: {e}", flush=True)
 
     return {
         "compile_time": compile_time,
@@ -196,6 +209,7 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
         "cosine": avg_cos,
         "batch_size": batch_size,
         "tokens_per_min": tokens_per_min,
+        "parallel_tokens_per_min": parallel_tpm,
         "fhe_result": result,
     }
 
@@ -257,7 +271,7 @@ def _run_single_config(idx, rank, n_bits, p_error, batch_size, label, hidden,
     env["PYTHONUNBUFFERED"] = "1"
     proc = subprocess.run(
         [sys.executable, "-u", str(wrapper)],
-        env=env, capture_output=True, text=True, timeout=1800
+        env=env, capture_output=True, text=True, timeout=3600
     )
     print(proc.stdout, flush=True)
     if proc.returncode != 0:
@@ -376,9 +390,11 @@ def _run_optimization():
             if "error" in r:
                 print(f"  {r['label']:>25s}: FAILED - {r['error'][:60]}{marker}")
             else:
+                ptpm = r.get("parallel_tokens_per_min")
+                p_str = f", parallel={ptpm:.1f} tok/min" if ptpm else ""
                 print(f"  {r['label']:>25s}: {r['tokens_per_min']:7.1f} tok/min, "
                       f"full_cos={r['full_cosine']:.4f}, "
-                      f"time={r['inference_time']:.3f}s, batch={r['batch_size']}{marker}")
+                      f"time={r['inference_time']:.3f}s, batch={r['batch_size']}{p_str}{marker}")
         print("=" * 70)
         print(f"BEST: {best['label']}, {best['tokens_per_min']:.1f} tok/min, "
               f"quality={best['full_cosine']:.4f}")
