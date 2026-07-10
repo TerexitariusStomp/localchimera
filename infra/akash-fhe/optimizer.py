@@ -386,7 +386,10 @@ async def start_optimization():
     opt_cmd = [sys.executable, "-u", wrapper]
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
-    opt_proc = subprocess.Popen(opt_cmd, env=env)
+    # Redirect stderr to crash log so we can see if wrapper fails before opening main log
+    crash_log = open("/app/opt_crash.log", "w")
+    opt_proc = subprocess.Popen(opt_cmd, env=env,
+                                stdout=crash_log, stderr=crash_log)
     return JSONResponse(content={"status": "started", "pid": opt_proc.pid})
 
 
@@ -397,7 +400,12 @@ async def get_logs():
         with open("/app/opt_subprocess.log") as f:
             return JSONResponse(content={"logs": f.read()[-3000:]})
     except Exception as e:
-        return JSONResponse(content={"logs": "", "error": str(e)})
+        # Try crash log
+        try:
+            with open("/app/opt_crash.log") as f:
+                return JSONResponse(content={"logs": f.read()[-3000:], "note": "from crash log"})
+        except Exception:
+            return JSONResponse(content={"logs": "", "error": str(e)})
 
 
 @app.get("/optimize")
@@ -426,16 +434,7 @@ async def results():
 
 if __name__ == "__main__":
     import uvicorn
-    import subprocess
-    import sys
 
-    # Start optimization as a separate Python subprocess to avoid CUDA thread/fork issues
-    # The server starts immediately so health checks pass
-    opt_cmd = [sys.executable, "-c",
-        "import sys; sys.path.insert(0, '/app'); "
-        "from optimizer import _run_optimization; _run_optimization()"]
-    opt_proc = subprocess.Popen(opt_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-    print(f"Optimization running as PID {opt_proc.pid}. Starting server...")
+    print("Server starting. Use /start to trigger optimization.")
     sys.stdout.flush()
     uvicorn.run(app, host="0.0.0.0", port=8080)
