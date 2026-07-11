@@ -180,8 +180,12 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
     parallel_tpm = None
     parallel_n = 4
     try:
+        if batch_size > 1:
+            par_shape = (1, batch_size * input_shape[1])
+        else:
+            par_shape = input_shape
         enc_inputs = [client.quantize_encrypt_serialize(
-            torch.randn(1, batch_size * input_shape[1]) if batch_size > 1 else torch.randn(*input_shape)
+            np.random.randn(*par_shape).astype(np.float32)
         ) for _ in range(parallel_n)]
         servers = [FHEModelServer(work_dir) for _ in range(parallel_n)]
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_n) as executor:
