@@ -56,6 +56,7 @@ CONFIGS = [
     (1024, 7, 0.01, 2, "r1024_n7_pe01_b2"),
     (1024, 6, 0.01, 2, "r1024_n6_pe01_b2"),
     (1024, 7, 0.005, 2, "r1024_n7_pe005_b2"),
+    (1024, 6, 0.01, 4, "r1024_n6_pe01_b4"),
     (512, 7, 0.01, 4, "r512_n7_pe01_b4"),
     (512, 6, 0.01, 4, "r512_n6_pe01_b4"),
 
@@ -181,7 +182,7 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
 
     # Test parallel circuit execution (run multiple inferences concurrently)
     parallel_tpm = None
-    parallel_n = 8
+    parallel_n = 4
     try:
         if batch_size > 1:
             par_shape = (1, batch_size * input_shape[1])
