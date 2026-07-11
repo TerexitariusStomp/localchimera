@@ -52,18 +52,14 @@ CONFIGS = [
     (1024, 6, 0.005, 1, "r1024_n6_pe005_b1"),
     (1024, 5, 0.01, 1, "r1024_n5_pe01_b1"),
 
-    # Block-diagonal batched (small batches, low-rank only)
+    # Block-diagonal batched (batch=2 only to avoid OOM during compilation)
     (1024, 7, 0.01, 2, "r1024_n7_pe01_b2"),
-    (1024, 7, 0.01, 4, "r1024_n7_pe01_b4"),
     (1024, 6, 0.01, 2, "r1024_n6_pe01_b2"),
-    (1024, 6, 0.01, 4, "r1024_n6_pe01_b4"),
     (1024, 7, 0.005, 2, "r1024_n7_pe005_b2"),
-    (1024, 7, 0.005, 4, "r1024_n7_pe005_b4"),
 
     # Lower precision for speed comparison
     (1024, 4, 0.01, 1, "r1024_n4_pe01_b1"),
     (1024, 4, 0.01, 2, "r1024_n4_pe01_b2"),
-    (1024, 4, 0.01, 4, "r1024_n4_pe01_b4"),
 
     # Full composed (no SVD) batch=1 only — too large for block-diag
     (8192, 6, 0.01, 1, "full_n6_b1"),
@@ -150,7 +146,7 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
     client = FHEModelClient(work_dir)
     eval_keys = client.get_serialized_evaluation_keys()
     if batch_size > 1:
-        enc_input = test_input.flatten()
+        enc_input = test_input.flatten().reshape(1, -1)
     else:
         enc_input = test_input
     encrypted = client.quantize_encrypt_serialize(enc_input)
@@ -182,10 +178,10 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
 
     # Test parallel circuit execution (run multiple inferences concurrently)
     parallel_tpm = None
-    parallel_n = 8
+    parallel_n = 4
     try:
         enc_inputs = [client.quantize_encrypt_serialize(
-            torch.randn(batch_size * input_shape[1]) if batch_size > 1 else torch.randn(*input_shape)
+            torch.randn(1, batch_size * input_shape[1]) if batch_size > 1 else torch.randn(*input_shape)
         ) for _ in range(parallel_n)]
         servers = [FHEModelServer(work_dir) for _ in range(parallel_n)]
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_n) as executor:
@@ -294,7 +290,7 @@ async def health():
 
 _opt_status = {"running": False, "done": False, "progress": 0, "total": len(CONFIGS), "current": ""}
 _opt_results = None
-_STATUS_FILE = OUT_DIR / "status.json"
+_STATUS_FILE = Path("/app/status.json")
 
 
 def _write_status():
@@ -320,8 +316,9 @@ def _run_optimization():
     _write_status()
 
     import shutil
-    if OUT_DIR.exists():
-        shutil.rmtree(OUT_DIR)
+    if OUT_DIR.exists() and any(OUT_DIR.iterdir()):
+        archive_dir = Path(f"/app/batched_opt_archive_{int(time.time())}")
+        shutil.move(str(OUT_DIR), str(archive_dir))
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     try:
