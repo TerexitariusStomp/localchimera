@@ -52,14 +52,17 @@ CONFIGS = [
     (1024, 6, 0.005, 1, "r1024_n6_pe005_b1"),
     (1024, 5, 0.01, 1, "r1024_n5_pe01_b1"),
 
-    # Block-diagonal batched (batch=2 only to avoid OOM during compilation)
+    # Block-diagonal batched (batch=2 with high rank, batch=4 with lower rank)
     (1024, 7, 0.01, 2, "r1024_n7_pe01_b2"),
     (1024, 6, 0.01, 2, "r1024_n6_pe01_b2"),
     (1024, 7, 0.005, 2, "r1024_n7_pe005_b2"),
+    (512, 7, 0.01, 4, "r512_n7_pe01_b4"),
+    (512, 6, 0.01, 4, "r512_n6_pe01_b4"),
 
     # Lower precision for speed comparison
     (1024, 4, 0.01, 1, "r1024_n4_pe01_b1"),
     (1024, 4, 0.01, 2, "r1024_n4_pe01_b2"),
+    (512, 4, 0.01, 4, "r512_n4_pe01_b4"),
 
     # Full composed (no SVD) batch=1 only — too large for block-diag
     (8192, 6, 0.01, 1, "full_n6_b1"),
@@ -178,7 +181,7 @@ def _compile_and_test_batched(module, name, input_shape, ref, test_input, out_di
 
     # Test parallel circuit execution (run multiple inferences concurrently)
     parallel_tpm = None
-    parallel_n = 4
+    parallel_n = 8
     try:
         if batch_size > 1:
             par_shape = (1, batch_size * input_shape[1])
