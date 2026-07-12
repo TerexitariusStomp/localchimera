@@ -8,6 +8,7 @@ on:
       - infra/akash-fhe/Dockerfile.optimizer
       - infra/akash-fhe/server.py
       - infra/akash-fhe/optimizer.py
+      - infra/akash-fhe/optimizer_hybrid.py
       - infra/akash-fhe/build.sh
       - infra/akash-fhe/build-optimizer.sh
       - infra/akash-fhe/server_files/**
