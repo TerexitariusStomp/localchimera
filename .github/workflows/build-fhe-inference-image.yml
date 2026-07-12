@@ -9,6 +9,7 @@ on:
       - infra/akash-fhe/server.py
       - infra/akash-fhe/optimizer.py
       - infra/akash-fhe/build.sh
+      - infra/akash-fhe/build-optimizer.sh
       - infra/akash-fhe/server_files/**
       - infra/akash-fhe/client_files/**
       - .github/workflows/build-fhe-inference-image.yml
@@ -18,6 +19,7 @@ on:
       - infra/akash-fhe/server.py
       - infra/akash-fhe/server_files/**
       - infra/akash-fhe/client_files/**
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
