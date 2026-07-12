@@ -7,11 +7,12 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends binutils && rm -rf /var/lib/apt/lists/*
 
-# PyTorch cu118 and concrete-python GPU wheels bundle the CUDA runtime libraries
-# they need, so we do not copy the full CUDA runtime image into the final layer.
+# Use CPU PyTorch and concrete-ml's CPU concrete-python to keep the image small
+# enough to pull on Akash providers. The SDL still requests an H100 GPU so the pod
+# is GPU-enabled; switching to GPU concrete-python is a future image-only change.
 RUN pip install --no-cache-dir \
-    --index-url https://download.pytorch.org/whl/cu118 \
-    torch==2.3.1+cu118 && \
+    --index-url https://download.pytorch.org/whl/cpu \
+torch==2.3.1+cpu && \
     pip install --no-cache-dir \
     concrete-ml==1.9.0 \
     transformers \
