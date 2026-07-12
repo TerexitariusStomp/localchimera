@@ -28,7 +28,7 @@ services:
       - /bin/sh
     args:
       - -c
-      - curl -sL -o /app/optimizer.py https://raw.githubusercontent.com/TerexitariusStomp/localchimera/main/infra/akash-fhe/optimizer.py && python -m uvicorn optimizer:app --host 0.0.0.0 --port 8080
+      - python -c "import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/TerexitariusStomp/localchimera/main/infra/akash-fhe/optimizer.py', '/app/optimizer.py')" && python -m uvicorn optimizer:app --host 0.0.0.0 --port 8080
 
 profiles:
   compute:
