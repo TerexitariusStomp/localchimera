@@ -69,6 +69,42 @@ def _load_synthetic_qwen_moe(model_id):
     return {"q": q, "k": k, "v": v, "o": o, "w1": w1, "w3": w3}, cfg
 
 
+def _load_synthetic_qwen_full_model(model_id):
+    """Generate synthetic weights for all layers of a Qwen3.5/3.6 MoE model.
+
+    Used for full-model wiring tests. Does not download the full checkpoint.
+    """
+    from huggingface_hub import hf_hub_download
+    config_path = hf_hub_download(model_id, "config.json")
+    with open(config_path) as f:
+        cfg = json.load(f).get("text_config", {})
+    hidden = int(cfg.get("hidden_size", 4096))
+    n_heads = int(cfg.get("num_attention_heads", 32))
+    n_kv = int(cfg.get("num_key_value_heads", 2))
+    head_dim = hidden // n_heads
+    moe_int = int(cfg.get("moe_intermediate_size", 1024) or 1024)
+    n_exp_per_tok = int(cfg.get("num_experts_per_tok", 8))
+    num_layers = int(cfg.get("num_hidden_layers", 40))
+
+    layers = []
+    for i in range(num_layers):
+        # Simplified attention weights (no positional/rope)
+        q = torch.randn(hidden, hidden)
+        k = torch.randn(n_kv * head_dim, hidden)
+        v = torch.randn(n_kv * head_dim, hidden)
+        o = torch.randn(hidden, hidden)
+        # MoE weights: one gate per active expert, averaged
+        w1 = torch.randn(n_exp_per_tok * moe_int, hidden)
+        w3 = torch.randn(n_exp_per_tok * moe_int, hidden)
+        w2 = torch.randn(hidden, n_exp_per_tok * moe_int)
+        layers.append({
+            "q": q, "k": k, "v": v, "o": o,
+            "w1": w1, "w3": w3, "w2": w2,
+        })
+    print(f"Synthetic {model_id} full model: {num_layers} layers, hidden={hidden}", flush=True)
+    return {"layers": layers, "num_layers": num_layers}, cfg
+
+
 def _detect_worker_index() -> int:
     """Detect worker index from Kubernetes-style hostname or env var.
 
@@ -159,12 +195,73 @@ _weights = None
 _config = None
 
 
+def _load_real_layer_glm4(model_id, layer_idx=0):
+    """Load one real transformer layer from GLM-4-32B-0414.
+
+    GLM-4 uses the standard Llama-style attention + SwiGLU MLP naming.
+    The mlp.gate_up_proj tensor is split into gate (w1) and up (w3).
+    """
+    from huggingface_hub import hf_hub_download
+    config_path = hf_hub_download(model_id, "config.json")
+    with open(config_path) as f:
+        cfg = json.load(f)
+    idx_path = hf_hub_download(model_id, "model.safetensors.index.json")
+    with open(idx_path) as f:
+        idx = json.load(f)
+
+    # Collect keys for the requested layer
+    target_keys = {
+        "q": f"model.layers.{layer_idx}.self_attn.q_proj.weight",
+        "k": f"model.layers.{layer_idx}.self_attn.k_proj.weight",
+        "v": f"model.layers.{layer_idx}.self_attn.v_proj.weight",
+        "o": f"model.layers.{layer_idx}.self_attn.o_proj.weight",
+        "gate_up": f"model.layers.{layer_idx}.mlp.gate_up_proj.weight",
+        "down": f"model.layers.{layer_idx}.mlp.down_proj.weight",
+    }
+
+    needed_files = set()
+    for key in target_keys.values():
+        file = idx["weight_map"].get(key)
+        if file is None:
+            raise RuntimeError(f"Key {key} not found in GLM-4 index")
+        needed_files.add(file)
+
+    weights = {}
+    for filename in needed_files:
+        file_path = hf_hub_download(model_id, filename)
+        file_weights = load_file(file_path)
+        for key in target_keys.values():
+            if key in file_weights:
+                weights[key] = file_weights[key].float()
+
+    missing = [k for k in target_keys.values() if k not in weights]
+    if missing:
+        raise RuntimeError(f"Missing GLM-4 weights: {missing}")
+
+    gate_up = weights[target_keys["gate_up"]]
+    intermediate = gate_up.shape[0] // 2
+    gate, up = gate_up[:intermediate], gate_up[intermediate:]
+
+    return {
+        "q": weights[target_keys["q"]],
+        "k": weights[target_keys["k"]],
+        "v": weights[target_keys["v"]],
+        "o": weights[target_keys["o"]],
+        "w1": gate,
+        "w3": up,
+    }, cfg
+
+
 def _load():
     global _weights, _config
     if _weights is not None:
         return _weights, _config
     if "qwen3.5" in MODEL_ID.lower() or "qwen3.6" in MODEL_ID.lower():
         _weights, _config = _load_synthetic_qwen_moe(MODEL_ID)
+        return _weights, _config
+    if "glm-4" in MODEL_ID.lower():
+        layer_idx = int(os.getenv("FHE_LAYER_IDX", "0"))
+        _weights, _config = _load_real_layer_glm4(MODEL_ID, layer_idx)
         return _weights, _config
     config_path = hf_hub_download(MODEL_ID, "config.json")
     with open(config_path) as f:
