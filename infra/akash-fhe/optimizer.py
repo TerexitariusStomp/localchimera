@@ -37,6 +37,7 @@ app = FastAPI(title="FHE Batched No-Quality-Loss Optimizer", version="0.1.0")
 opt_proc = None
 
 MODEL_ID = os.getenv("FHE_MODEL_ID", "LiquidAI/LFM2.5-230M")
+# Trigger CI rebuild: bump rev when changing model loading or configs
 OUT_DIR = Path("/app/batched_opt")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
