@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import asyncio
 import concurrent.futures
+import re
 import numpy as np
 from pathlib import Path
 
@@ -35,13 +36,71 @@ app = FastAPI(title="FHE Batched No-Quality-Loss Optimizer", version="0.1.0")
 # Global subprocess handle for manual trigger
 opt_proc = None
 
-MODEL_ID = "LiquidAI/LFM2.5-230M"
+MODEL_ID = os.getenv("FHE_MODEL_ID", "LiquidAI/LFM2.5-230M")
 OUT_DIR = Path("/app/batched_opt")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+
+def _load_synthetic_qwen_moe(model_id):
+    """Generate synthetic weights matching a Qwen3.5/3.6 MoE model layer.
+
+    Avoids downloading hundreds of gigabytes; uses the official config for dimensions.
+    """
+    from huggingface_hub import hf_hub_download
+    config_path = hf_hub_download(model_id, "config.json")
+    with open(config_path) as f:
+        cfg = json.load(f).get("text_config", {})
+    hidden = int(cfg.get("hidden_size", 4096))
+    n_heads = int(cfg.get("num_attention_heads", 32))
+    n_kv = int(cfg.get("num_key_value_heads", 2))
+    head_dim = hidden // n_heads
+    moe_int = int(cfg.get("moe_intermediate_size", 1024) or 1024)
+    n_exp_per_tok = int(cfg.get("num_experts_per_tok", 8))
+    # Build a single composed projection: q, k, v, o, moe_w1, moe_w3
+    q = torch.randn(hidden, hidden)
+    k = torch.randn(n_kv * head_dim, hidden)
+    v = torch.randn(n_kv * head_dim, hidden)
+    o = torch.randn(hidden, hidden)
+    w1 = torch.randn(n_exp_per_tok * moe_int, hidden)
+    w3 = torch.randn(n_exp_per_tok * moe_int, hidden)
+    composed = torch.cat([q, k, v, o, w1, w3], dim=0)
+    print(f"Synthetic {model_id} layer: {composed.shape[0]} x {composed.shape[1]}", flush=True)
+    return {"q": q, "k": k, "v": v, "o": o, "w1": w1, "w3": w3}, cfg
+
+
+def _detect_worker_index() -> int:
+    """Detect worker index from Kubernetes-style hostname or env var.
+
+    Akash deployments with count > 1 create pods named like
+    fhe-optimizer-0, fhe-optimizer-1, etc. We use the hostname suffix
+    when available, otherwise fall back to FHE_WORKER_INDEX.
+    """
+    hostname = os.getenv("HOSTNAME", "")
+    m = re.search(r"-(\d+)$", hostname)
+    if m:
+        return int(m.group(1))
+    return int(os.getenv("FHE_WORKER_INDEX", "0"))
+
+
+FHE_WORKER_INDEX = _detect_worker_index()
+FHE_WORKER_COUNT = int(os.getenv("FHE_WORKER_COUNT", "1"))
+FHE_AUTOSTART = os.getenv("FHE_AUTOSTART", "0").lower() in ("1", "true", "yes")
+
+
+def _get_worker_configs():
+    """Return the subset of CONFIGS assigned to this worker."""
+    if FHE_WORKER_COUNT <= 1:
+        return CONFIGS
+    return [
+        cfg
+        for idx, cfg in enumerate(CONFIGS)
+        if idx % FHE_WORKER_COUNT == FHE_WORKER_INDEX
+    ]
+
+
 # Configs: (rank, n_bits, p_error, batch_size)
 # Focus on maintaining quality >= 0.95 while maximizing throughput
-CONFIGS = [
+_BASE_CONFIGS = [
     # Baseline: full composed, no low-rank, batch=1
     (1024, 5, 0.02, 1, "baseline_full"),
 
@@ -70,6 +129,22 @@ CONFIGS = [
     (8192, 7, 0.01, 1, "full_n7_b1"),
 ]
 
+# Minimal config set for large-model scale tests (e.g. Qwen3.5-397B).
+# Higher hidden dims need higher ranks; avoid no-SVD/full configs because
+# the composed matrix is too large for practical FHE compilation.
+_SCALE_TEST_CONFIGS = [
+    (512, 4, 0.01, 1, "r512_n4_pe01_b1"),
+    (1024, 4, 0.01, 1, "r1024_n4_pe01_b1"),
+    (2048, 4, 0.01, 1, "r2048_n4_pe01_b1"),
+    (4096, 4, 0.01, 1, "r4096_n4_pe01_b1"),
+    (512, 5, 0.01, 1, "r512_n5_pe01_b1"),
+    (1024, 5, 0.01, 1, "r1024_n5_pe01_b1"),
+    (2048, 5, 0.01, 1, "r2048_n5_pe01_b1"),
+    (4096, 5, 0.01, 1, "r4096_n5_pe01_b1"),
+]
+
+CONFIGS = _SCALE_TEST_CONFIGS if os.getenv("FHE_SCALE_TEST", "0").lower() in ("1", "true", "yes") else _BASE_CONFIGS
+
 QUALITY_THRESHOLD = 0.95
 
 _weights = None
@@ -79,6 +154,9 @@ _config = None
 def _load():
     global _weights, _config
     if _weights is not None:
+        return _weights, _config
+    if "qwen3.5" in MODEL_ID.lower() or "qwen3.6" in MODEL_ID.lower():
+        _weights, _config = _load_synthetic_qwen_moe(MODEL_ID)
         return _weights, _config
     config_path = hf_hub_download(MODEL_ID, "config.json")
     with open(config_path) as f:
@@ -292,13 +370,32 @@ def _run_single_config(idx, rank, n_bits, p_error, batch_size, label, hidden,
 async def health():
     return JSONResponse(content={
         "status": "ok",
+        "model": MODEL_ID,
+        "worker_index": FHE_WORKER_INDEX,
+        "worker_count": FHE_WORKER_COUNT,
+        "worker_configs": len(_WORKER_CONFIGS),
         "gpu_enabled": concrete.compiler.check_gpu_enabled(),
     })
 
 
-_opt_status = {"running": False, "done": False, "progress": 0, "total": len(CONFIGS), "current": ""}
+@app.get("/worker")
+async def worker_info():
+    """Return this worker's identity and assigned config subset."""
+    return JSONResponse(content={
+        "worker_index": FHE_WORKER_INDEX,
+        "worker_count": FHE_WORKER_COUNT,
+        "model": MODEL_ID,
+        "hostname": os.getenv("HOSTNAME", ""),
+        "configs": [c[4] for c in _WORKER_CONFIGS],
+        "autostart": FHE_AUTOSTART,
+    })
+
+
+_WORKER_CONFIGS = _get_worker_configs()
+_opt_status = {"running": False, "done": False, "progress": 0, "total": len(_WORKER_CONFIGS), "current": ""}
 _opt_results = None
 _STATUS_FILE = Path("/app/status.json")
+_RESULTS_FILE = OUT_DIR / f"results_worker_{FHE_WORKER_INDEX}.json"
 
 
 def _write_status():
@@ -310,7 +407,7 @@ def _read_status():
     if _STATUS_FILE.exists():
         with open(_STATUS_FILE) as f:
             return json.load(f)
-    return {"running": False, "done": False, "progress": 0, "total": len(CONFIGS), "current": ""}
+    return {"running": False, "done": False, "progress": 0, "total": len(_WORKER_CONFIGS), "current": ""}
 
 
 def _run_optimization():
@@ -345,9 +442,10 @@ def _run_optimization():
         np.save("/tmp/_composed_all.npy", composed_all.numpy())
 
         results = []
+        worker_configs = _get_worker_configs()
 
-        for idx, (rank, n_bits, p_error, batch_size, label) in enumerate(CONFIGS):
-            print(f"\n[{idx+1}/{len(CONFIGS)}] {label}", flush=True)
+        for idx, (rank, n_bits, p_error, batch_size, label) in enumerate(worker_configs):
+            print(f"\n[{idx+1}/{len(worker_configs)}] {label} (worker={FHE_WORKER_INDEX})", flush=True)
 
             x_np = np.random.randn(batch_size, hidden).astype(np.float32)
             np.save("/tmp/_test_input.npy", x_np)
@@ -407,11 +505,13 @@ def _run_optimization():
 
         output = {
             "gpu": gpu_name,
+            "worker_index": FHE_WORKER_INDEX,
+            "worker_count": FHE_WORKER_COUNT,
             "quality_threshold": QUALITY_THRESHOLD,
             "best": best,
             "all_results": results,
         }
-        with open(OUT_DIR / "results.json", "w") as f:
+        with open(_RESULTS_FILE, "w") as f:
             json.dump(output, f, indent=2, default=str)
 
         _opt_results = output
@@ -429,12 +529,11 @@ def _run_optimization():
         _write_status()
 
 
-@app.get("/start")
-async def start_optimization():
-    """Manually trigger optimization subprocess."""
+def _start_optimization_subprocess():
+    """Launch the optimization in a detached subprocess."""
     global opt_proc
     if opt_proc and opt_proc.poll() is None:
-        return JSONResponse(content={"status": "already_running"})
+        return None
     wrapper = "/app/_run_opt.py"
     with open(wrapper, "w") as f:
         f.write(
@@ -458,7 +557,24 @@ async def start_optimization():
     crash_log = open("/app/opt_crash.log", "w")
     opt_proc = subprocess.Popen(opt_cmd, env=env,
                                 stdout=crash_log, stderr=crash_log)
-    return JSONResponse(content={"status": "started", "pid": opt_proc.pid})
+    return opt_proc
+
+
+@app.get("/start")
+async def start_optimization():
+    """Manually trigger optimization subprocess."""
+    proc = _start_optimization_subprocess()
+    if proc is None:
+        return JSONResponse(content={"status": "already_running"})
+    return JSONResponse(content={"status": "started", "pid": proc.pid})
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Auto-start optimization when FHE_AUTOSTART is enabled."""
+    if FHE_AUTOSTART:
+        print("FHE_AUTOSTART is enabled; launching optimization subprocess...", flush=True)
+        _start_optimization_subprocess()
 
 
 @app.get("/logs")
@@ -492,10 +608,9 @@ async def status():
 async def results():
     if _opt_results is not None:
         return JSONResponse(content=json.loads(json.dumps(_opt_results, default=str)))
-    # Try reading from file
-    results_file = OUT_DIR / "results.json"
-    if results_file.exists():
-        with open(results_file) as f:
+    # Try reading from this worker's results file
+    if _RESULTS_FILE.exists():
+        with open(_RESULTS_FILE) as f:
             return JSONResponse(content=json.load(f))
     return JSONResponse(content={"status": "no_results", **_opt_status})
 

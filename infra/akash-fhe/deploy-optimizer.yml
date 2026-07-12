@@ -1,9 +1,13 @@
 ---
 version: "2.0"
 
+# Horizontally-scalable FHE optimizer deployment on Akash.
+# Each pod auto-detects its worker index from the hostname ordinal
+# and runs a disjoint subset of the optimization configs.
+
 services:
   fhe-optimizer:
-    image: ghcr.io/${IMAGE_OWNER}/fhe-optimizer:sha-d7eec7e
+    image: ghcr.io/${IMAGE_OWNER}/fhe-optimizer:blockdiag3
     credentials:
       host: ghcr.io
       username: ${IMAGE_OWNER}
@@ -14,7 +18,12 @@ services:
         to:
           - global: true
     env:
-      - FHE_MODEL_NAME=lfm2.5-230m
+      - FHE_MODEL_NAME=qwen3.6-35b-a3b
+      - FHE_MODEL_ID=Qwen/Qwen3.6-35B-A3B
+      - FHE_SCALE_TEST=1
+      - FHE_WORKER_INDEX=${FHE_WORKER_INDEX:-0}
+      - FHE_WORKER_COUNT=${FHE_WORKER_COUNT:-1}
+      - FHE_AUTOSTART=1
 
 profiles:
   compute:
@@ -42,7 +51,7 @@ profiles:
       pricing:
         fhe-h100:
           denom: uact
-          amount: 3000000
+          amount: 1000000
 
 deployment:
   fhe-optimizer:
