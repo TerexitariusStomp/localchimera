@@ -21,8 +21,8 @@ services:
       - FHE_MODEL_NAME=qwen3.6-35b-a3b
       - FHE_MODEL_ID=Qwen/Qwen3.6-35B-A3B
       - FHE_SCALE_TEST=1
-      - FHE_WORKER_INDEX=${FHE_WORKER_INDEX:-0}
-      - FHE_WORKER_COUNT=${FHE_WORKER_COUNT:-1}
+      - FHE_WORKER_INDEX=0
+      - FHE_WORKER_COUNT=1
       - FHE_AUTOSTART=0
 
 profiles:

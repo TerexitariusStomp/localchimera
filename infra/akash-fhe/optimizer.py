@@ -80,11 +80,18 @@ def _detect_worker_index() -> int:
     m = re.search(r"-(\d+)$", hostname)
     if m:
         return int(m.group(1))
-    return int(os.getenv("FHE_WORKER_INDEX", "0"))
+    val = os.getenv("FHE_WORKER_INDEX", "0")
+    try:
+        return int(val)
+    except ValueError:
+        return 0
 
 
 FHE_WORKER_INDEX = _detect_worker_index()
-FHE_WORKER_COUNT = int(os.getenv("FHE_WORKER_COUNT", "1"))
+try:
+    FHE_WORKER_COUNT = int(os.getenv("FHE_WORKER_COUNT", "1"))
+except ValueError:
+    FHE_WORKER_COUNT = 1
 FHE_AUTOSTART = os.getenv("FHE_AUTOSTART", "0").lower() in ("1", "true", "yes")
 
 
