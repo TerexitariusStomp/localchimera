@@ -18,10 +18,12 @@ services:
         to:
           - global: true
     env:
-      - FHE_MODEL_NAME=glm4-32b
-      - FHE_MODEL_ID=zai-org/GLM-4-32B-0414
-      - FHE_LAYER_IDX=0
-      - FHE_SCALE_TEST=1
+      - FHE_MODEL_NAME=hybrid-gpt2
+      - FHE_MODEL_ID=openai-community/gpt2
+      - FHE_HYBRID_MODE=execute
+      - FHE_USE_FP16=0
+      - FHE_N_BITS=8
+      - FHE_DYNAMIC_QUANT=1
       - FHE_WORKER_INDEX=0
       - FHE_WORKER_COUNT=1
       - FHE_AUTOSTART=0

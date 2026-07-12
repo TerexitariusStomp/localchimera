@@ -36,7 +36,8 @@ RUN pip install --no-cache-dir "setuptools<81" && \
 
 ARG CACHE_BUST=1
 COPY optimizer.py /app/optimizer.py
+COPY optimizer_hybrid.py /app/optimizer_hybrid.py
 
 EXPOSE 8080
 
-CMD ["python", "-m", "uvicorn", "optimizer:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python", "-m", "uvicorn", "optimizer_hybrid:app", "--host", "0.0.0.0", "--port", "8080"]
