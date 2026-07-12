@@ -20,8 +20,7 @@ import torch
 from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer, Conv1D
 
-from concrete.ml.torch.hybrid_model import HybridFHEModel, HybridFHEMode
-from concrete.ml.deployment import FHEModelDev, FHEModelServer, FHEModelClient
+from concrete.ml.torch.hybrid_model import HybridFHEModel
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
