@@ -24,11 +24,6 @@ services:
       - FHE_WORKER_INDEX=${FHE_WORKER_INDEX:-0}
       - FHE_WORKER_COUNT=${FHE_WORKER_COUNT:-1}
       - FHE_AUTOSTART=1
-    command:
-      - /bin/sh
-    args:
-      - -c
-      - python -c "import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/TerexitariusStomp/localchimera/main/infra/akash-fhe/optimizer.py', '/app/optimizer.py')" && python -m uvicorn optimizer:app --host 0.0.0.0 --port 8080
 
 profiles:
   compute:
