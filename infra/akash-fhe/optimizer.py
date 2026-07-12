@@ -33,7 +33,7 @@ from fastapi.responses import JSONResponse
 
 app = FastAPI(title="FHE Batched No-Quality-Loss Optimizer", version="0.1.0")
 
-# Global subprocess handle for manual trigger
+# Global thread handle for manual trigger
 opt_proc = None
 
 MODEL_ID = os.getenv("FHE_MODEL_ID", "LiquidAI/LFM2.5-230M")
@@ -530,52 +530,45 @@ def _run_optimization():
         _write_status()
 
 
-def _start_optimization_subprocess():
-    """Launch the optimization in a detached subprocess."""
+def _start_optimization_thread():
+    """Launch the optimization in a background daemon thread."""
     global opt_proc
-    if opt_proc and opt_proc.poll() is None:
+    if opt_proc and opt_proc.is_alive():
         return None
-    wrapper = "/app/_run_opt.py"
-    with open(wrapper, "w") as f:
-        f.write(
-            "import sys, traceback\n"
-            "log = open('/app/opt_subprocess.log', 'w', buffering=1)\n"
-            "sys.stdout = log\n"
-            "sys.stderr = log\n"
-            "sys.path.insert(0, '/app')\n"
-            "print('Subprocess started', flush=True)\n"
-            "try:\n"
-            "    from optimizer import _run_optimization\n"
-            "    _run_optimization()\n"
-            "except Exception as e:\n"
-            "    traceback.print_exc()\n"
-            "    print('FATAL:', e, flush=True)\n"
-        )
-    opt_cmd = [sys.executable, "-u", wrapper]
-    env = dict(os.environ)
-    env["PYTHONUNBUFFERED"] = "1"
-    # Redirect stderr to crash log so we can see if wrapper fails before opening main log
-    crash_log = open("/app/opt_crash.log", "w")
-    opt_proc = subprocess.Popen(opt_cmd, env=env,
-                                stdout=crash_log, stderr=crash_log)
+    import threading
+    import contextlib
+
+    log_file = open("/app/opt_subprocess.log", "w", buffering=1)
+
+    def run_with_logging():
+        with contextlib.redirect_stdout(log_file), contextlib.redirect_stderr(log_file):
+            try:
+                _run_optimization()
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(f"FATAL: {e}", flush=True)
+
+    opt_proc = threading.Thread(target=run_with_logging, daemon=True)
+    opt_proc.start()
     return opt_proc
 
 
 @app.get("/start")
 async def start_optimization():
-    """Manually trigger optimization subprocess."""
-    proc = _start_optimization_subprocess()
-    if proc is None:
+    """Manually trigger optimization in a background thread."""
+    thread = _start_optimization_thread()
+    if thread is None:
         return JSONResponse(content={"status": "already_running"})
-    return JSONResponse(content={"status": "started", "pid": proc.pid})
+    return JSONResponse(content={"status": "started", "thread": True})
 
 
 @app.on_event("startup")
 async def startup_event():
     """Auto-start optimization when FHE_AUTOSTART is enabled."""
     if FHE_AUTOSTART:
-        print("FHE_AUTOSTART is enabled; launching optimization subprocess...", flush=True)
-        _start_optimization_subprocess()
+        print("FHE_AUTOSTART is enabled; launching optimization thread...", flush=True)
+        _start_optimization_thread()
 
 
 @app.get("/logs")
