@@ -7,7 +7,7 @@ version: "2.0"
 
 services:
   fhe-optimizer:
-    image: ghcr.io/${IMAGE_OWNER}/fhe-optimizer:sha-4924554d
+    image: ghcr.io/${IMAGE_OWNER}/fhe-optimizer:sha-e10e586
     credentials:
       host: ghcr.io
       username: ${IMAGE_OWNER}
