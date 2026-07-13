@@ -1,3 +1,5 @@
+FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04 AS cuda-runtime
+
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -7,12 +9,13 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends binutils && rm -rf /var/lib/apt/lists/*
 
-# Use CPU PyTorch and concrete-ml's CPU concrete-python to keep the image small
-# enough to pull on Akash providers. The SDL still requests an H100 GPU so the pod
-# is GPU-enabled; switching to GPU concrete-python is a future image-only change.
+COPY --from=cuda-runtime /usr/local/cuda /usr/local/cuda
+ENV PATH=/usr/local/cuda/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64
+
 RUN pip install --no-cache-dir \
-    --index-url https://download.pytorch.org/whl/cpu \
-torch==2.3.1+cpu && \
+    --index-url https://download.pytorch.org/whl/cu118 \
+    torch==2.3.1+cu118 && \
     pip install --no-cache-dir \
     concrete-ml==1.9.0 \
     transformers \
@@ -20,7 +23,12 @@ torch==2.3.1+cpu && \
     huggingface-hub \
     fastapi \
     uvicorn \
-    python-multipart
+    python-multipart && \
+    pip uninstall -y concrete-python && \
+    pip install --no-cache-dir --force-reinstall \
+    --trusted-host pypi.zama.ai \
+    --extra-index-url https://pypi.zama.ai/gpu \
+    concrete-python==2.10.0
 
 RUN pip install --no-cache-dir "setuptools<81" && \
     python -c "import pkg_resources; print('pkg_resources OK')"
