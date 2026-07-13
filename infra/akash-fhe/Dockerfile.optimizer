@@ -19,7 +19,9 @@ RUN pip install --no-cache-dir \
     huggingface-hub \
     fastapi \
     uvicorn \
-    python-multipart && \
+    python-multipart \
+    requests \
+    numpy && \
     pip uninstall -y concrete-python && \
     pip install --no-cache-dir --force-reinstall \
     --trusted-host pypi.zama.ai \
